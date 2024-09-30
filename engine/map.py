@@ -1,5 +1,6 @@
 from __future__ import annotations # For not finished define declarations
 from enum import Enum
+import pygame
 
 M_X = 0
 M_Y = 1
@@ -20,13 +21,30 @@ class Position :
         self.x = x
         self.y = y
 
-    def move(self, direction: Move) :
-        self.x = direction.value[M_X]
-        self.y = direction.value[M_Y]
+    def __eq__(self, p: Position):
+        return self.x == p.x and self.y == p.y
 
-    def pivot(self, p: Position, direction: Move)
+    def moveTo(self, dst: Position):
+        direction = (0,0)
+        if dst.x > self.x :
+            direction[M_X] = 1
+        elif dst.x < self.x :
+            direction[M_X] = -1
+
+        if dst.y > self.y :
+            direction[M_Y] = 1
+        elif dst.y < self.y :
+            direction[M_Y] = -1
+        
+        self.x = direction[M_X]
+        self.y = direction[M_Y]
+
+    def pivot(self, p: Position, direction: Move):
         self.x = p.x + direction.value[M_X]
         self.y = p.y + direction.value[M_Y]
+
+    def __hash__(self):
+        return hash((self.x, self.y))
 
 
 class Service :
@@ -87,34 +105,53 @@ class Service :
 
         self.destination = other.destination
 
-        
+
+    # If the service is a taxi, stops and removes any activity it was doing, otherwise does nothing
+    def finish(self):
+        # TODO:
+
+
 class Map :
-    def __init__(self, width: int = 20, height: int = 20, *startServices: (Position, Service))
-        if(width < 1 or height < 0)
-            raise ValueError('A map creation has received a negative number')
+    def __init__(self, surface: pygame.Surface, width: int = 20, height: int = 20, *startServices: (Position, Service))
+        self.surface = surface
+        if(width < 2 or height < 2)
+            raise ValueError('Values of the map are too small. Minimums are: width = 2, height = 2')
         self.width = width
         self.height = height
+
         self.data = []
-        for _ in range(width * height):
-            self.data = None
-        for p, srv in startServices:
-            self.setService(p, srv)
+        for _ in width * height :
+            self.data.append(None)
+        for pos, srv in startServices :
+            self.setService(pos, srv)
+
+        self.surface = surface
+        
 
     def isInside(self, p: Position)
         return p.x >= 0 and p.x < self.width and p.y >= 0 and p.y <= self.height
 
 
-    def getService(self, p: Position) -> Service:
-        return self.data[p.x + (p.x * self.height)] if self.isInside(p) else None
+    def getService(self, p: Position) -> Service | list:
+        return self.data[p] if self.isInside(p) else None
 
 
     def setService(self, p: Position, srv: Service):
         if not self.isInside(p):
             raise ValueError(f'The position {p} is not inside the map. Failed to set taxi service')
-        self.data[p.x + (p.x * self.height)] = srv
+        # TODO: add multiple service per box support
+        self.data[p.x + (p.y * self.width)] = srv
 
-    def render(self, surface: pygame.Surface, px_width: int = 0, px_height: int = 0):
-        return 0 # TODO: render full map on the screen
 
-    def update(self, surface: pygame.Surface):
+    def render(self):
+        # Need to set the self.pxUpperCorner = Position
+        return 0 # TODO: render full map on the surface
+
+
+    # Updates (moves) one position one step or finishes a Service (if done)
+    def update(self, p: Position):
+        # Position is inside, service is a taxi with an objective, service is not finished
+        # So -> current position re-renders as first list element or empty
+        # -> moves position
+        # -> renders actual position as occupied (maybe getting a representation
         return 0 # TODO: rewrite any change in positions (see the most elegant way to connect services with map updates)
