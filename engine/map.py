@@ -1,4 +1,4 @@
-from __future__ import annotations # For not finished define declarations
+from __future__ import annotations # For not unfinished declarations
 from enum import Enum
 import pygame
 
@@ -89,9 +89,7 @@ class Service :
         self.destinationPos = dst
 
 
-    # Overwrites the current service values with the other one's that are created and available
-    # If any identificator is overwritten, is left as orphan and auto managed
-    # Empty values of the other do not overwrite self values
+    # Merges a service with one another (substitute all values at least they are empty)
     def mergeWith(self, other: Service):
         if other.taxi > 0 :
             if self.taxi > 0 :
@@ -104,11 +102,7 @@ class Service :
             self.client = other.client
 
         self.destination = other.destination
-
-
-    # If the service is a taxi, stops and removes any activity it was doing, otherwise does nothing
-    def finish(self):
-        # TODO:
+        self.destinationPos = other.destinationPos
 
 
 class Map :
@@ -126,6 +120,9 @@ class Map :
             self.setService(pos, srv)
 
         self.surface = surface
+
+    def _idx(self, p) -> int:
+        return p.x + (p.y * self.width)
         
 
     def isInside(self, p: Position)
@@ -133,14 +130,19 @@ class Map :
 
 
     def getService(self, p: Position) -> Service | list:
-        return self.data[p] if self.isInside(p) else None
+        return self.data[self._idx(p)] if self.isInside(p) else None
 
 
     def setService(self, p: Position, srv: Service):
         if not self.isInside(p):
             raise ValueError(f'The position {p} is not inside the map. Failed to set taxi service')
-        # TODO: add multiple service per box support
-        self.data[p.x + (p.y * self.width)] = srv
+
+        if self.data[self._idx(p)] is None :
+            self.data[self._idx(p)] = srv
+        elif isinstance(self.data[self._idx(p)], Service):
+            self.data[self._idx(p)] = [self.data[self._idx(p)], srv]
+        else :
+            self.data[self._idx(p)].append(srv)
 
 
     def render(self):
@@ -149,7 +151,9 @@ class Map :
 
 
     # Updates (moves) one position one step or finishes a Service (if done)
-    def update(self, p: Position):
+    def updateAt(self, p: Position):
+        if(self.isInside(p) and hasattr(self, 'pxUpperCorner') and self.getService(p) is not None \
+                and self.getService(p).taxi > 0 self.getService(p).destinationPos is not None
         # Position is inside, service is a taxi with an objective, service is not finished
         # So -> current position re-renders as first list element or empty
         # -> moves position
