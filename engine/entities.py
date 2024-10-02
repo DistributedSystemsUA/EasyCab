@@ -1,48 +1,7 @@
-from __future__ import annotations # For not unfinished declarations
-from enum import Enum
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar
-import pygame
-
-M_X = 0
-M_Y = 1
-
-class Move(Enum) :
-    UP = (0, -1)
-    UP_RIGHT = (1, -1)
-    RIGHT = (1, 0)
-    DOWN_RIGHT = (1, 1)
-    DOWN = (0, 1)
-    DOWN_LEFT = (-1, 1)
-    LEFT = (0, -1)
-    UP_LEFT = (-1, -1)
-
-@dataclass
-class Position :
-    x: int = 0
-    y: int = 0
-
-    def moveTo(self, dst: Position):
-        direction = (0,0)
-        if dst.x > self.x :
-            direction[M_X] = 1
-        elif dst.x < self.x :
-            direction[M_X] = -1
-
-        if dst.y > self.y :
-            direction[M_Y] = 1
-        elif dst.y < self.y :
-            direction[M_Y] = -1
-        
-        self.x = direction[M_X]
-        self.y = direction[M_Y]
-
-    def pivot(self, p: Position, direction: Move):
-        self.x = p.x + direction.value[M_X]
-        self.y = p.y + direction.value[M_Y]
-
-    def __hash__(self):
-        return hash((self.x, self.y))
+from position import *
 
 
 class LogType(Enum):
@@ -69,8 +28,8 @@ class Taxi(Entity) :
 
     def __init__(self, origin: Position, dst: Position = 0):
         if not Taxi.OrphanTaxis :
-            self.id = Taxi.NextClientId
-            Taxi.NextClientId += 1
+            self.id = Taxi.NextTaxiId
+            Taxi.NextTaxiId += 1
         else :
             self.id = Taxi.OrphanTaxis.pop(0)
 
@@ -86,6 +45,7 @@ class Taxi(Entity) :
     def move(self):
         if dst is None: return
 
+        unrenderP = Position(self.pos.x, self.pos.y)
         self.pos.moveTo(self.dst)
         if self.pos == self.dst :
             if self.currentClient is not None:
@@ -154,64 +114,7 @@ class Client(Entity) :
         self.logType = LogType.WAITING.value
         self.pos = origin
 
-
     def __del__(self):
-        Client.OrphanClients.append(self.id)
+        self.OrphanClients.append(self.id)
+        self.OrphanDestinations.append(self.dstId)
 
-
-class Map :
-    def __init__(self, surface: pygame.Surface, width: int = 20, height: int = 20, *entities: Entity):
-        self.surface = surface
-        if(width < 2 or height < 2):
-            raise ValueError('Values of the map are too small. Minimums are: width = 2, height = 2')
-        self.width = width
-        self.height = height
-
-        self.entities = {}
-        self.positionedEntities = {}
-        self.addEntities(entities)
-        self.surface = surface
-
-
-    def isInside(self, p: Position):
-        return p.x >= 0 and p.x < self.width and p.y >= 0 and p.y <= self.height
-
-
-    def addEntities(self, *entities: Entity):
-        if entities is None : return
-
-        for e in entities :
-            if self.isInside(e.pos) :
-                self.entities[e.id] = e
-                self.positionedEntities[e.pos] = e
-            else :
-                print(f'The entity {e} is not inside the map')
-
-
-    def getEntity(self, eId: int) -> Entity:
-        if eId in self.entities :
-            return self.entities[eId]
-        else :
-            return None
-
-
-    def locateEntity(self, p: Position):
-        if p in self.positionedEntities:
-            return self.positionedEntities[p]
-        else :
-            return None
-
-    def removeEntity(*entities: Entity):
-        for e in entities:
-            del self.entities[e.id]
-            del self.positionedEntities[e.pid]
-
-
-    def render(self):
-        # Need to set the self.pxUpperCorner = Position
-        return 0 # TODO: render full map on the surface
-
-
-    # Updates (moves) one position one step or finishes a Service (if done)
-    def update(self, p: Position):
-        return 0 # TODO: rewrite any change in positions (see the most elegant way to connect services with map updates)
