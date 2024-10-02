@@ -1,5 +1,7 @@
 from __future__ import annotations # For not unfinished declarations
 from enum import Enum
+from dataclasses import dataclass
+from typing import ClassVar
 import pygame
 
 M_X = 0
@@ -15,14 +17,10 @@ class Move(Enum) :
     LEFT = (0, -1)
     UP_LEFT = (-1, -1)
 
-
+@dataclass
 class Position :
-    def __init__(self, x: int, y: int) :
-        self.x = x
-        self.y = y
-
-    def __eq__(self, p: Position):
-        return self.x == p.x and self.y == p.y
+    x: int = 0
+    y: int = 0
 
     def moveTo(self, dst: Position):
         direction = (0,0)
@@ -47,102 +45,166 @@ class Position :
         return hash((self.x, self.y))
 
 
-class Service :
-    NextTaxiId = 1
-    NextClientId = ord('a')
-    NextDestinationId = ord('A')
+class LogType(Enum):
+    STANDBY = 0
+    WAITING = 1,
+    BUSY = 2,
+    INCONVENIENCE = 3
 
-    OrphanTaxis = []
-    OrphanClients = []
-    OrphanDestinations = []
 
-    # Class contains: taxi, taxiLog, client, clientLog, destination, destinationPos
-    def __init__(self, genTaxi: bool, genClient: bool, dst: Position = None):
-        if genTaxi :
-            if Service.OrphanTaxis :
-                self.taxi = Service.OrphanTaxis.pop(0)
-            else :
-                self.taxi = Service.NextTaxiId
-                Service.NextTaxiId += 1
+@dataclass
+class Entity :
+    id: int = 0
+    logType: int = 0
+    pos: Position = None
+    dst: Position = None
+
+
+@dataclass(init = False)
+class Taxi(Entity) :
+    NextTaxiId: ClassVar[int] = 1
+    OrphanTaxis: ClassVar[list[int]] = []
+
+    currentClient: Client = None
+
+    def __init__(self, origin: Position, dst: Position = 0):
+        if not Taxi.OrphanTaxis :
+            self.id = Taxi.NextClientId
+            Taxi.NextClientId += 1
         else :
-            self.taxi = 0
-        self.taxiLog = 0 # Log zero always means nothing to do or waiting for an event
+            self.id = Taxi.OrphanTaxis.pop(0)
 
-        if genClient :
-            if Service.OrphanClients :
-                self.client = Service.OrphanClients.pop(0)
+        self.logType = LogType.STANDBY.value
+        self.pos = origin
+        self.dst = dst
+
+
+    def __del__(self):
+        Taxi.OrphanTaxis.append(self.id)
+
+
+    def move(self):
+        if dst is None: return
+
+        self.pos.moveTo(self.dst)
+        if self.pos == self.dst :
+            if self.currentClient is not None:
+                if self.logType == LogType.BUSY.value :
+                    self.finishService()
+                else : # WAITING so start service
+                    self.logType = LogType.BUSY.value
+                    self.currentClient.logType = Logtype.BUSY.value
+                    self.dst = self.currentClient.dst
             else :
-                self.client = Service.NextClientId
-                Service.NextClientId += 1
+                self.dst = None
+                self.logType = LogType.STANDBY.value
+
+
+    def aquireClient(self, c: Client):
+        if c is None or self.currentClient is not None :
+            print(f'ERROR: the taxi {self.id} can\'t aquire a new client because is carrying {self.currentClient}')
+            return
+
+        c.currentTaxi = self
+        c.logType = LogType.WAITING.value
+        self.currentClient = c
+        self.logType = LogType.WAITING.value
+        self.dst = c.pos
+
+
+    def finishService(self, newDst: Position = None):
+        if self.currentClient is None :
+            print(f'ERROR: the taxi {self.id} is not being used, can\'t finish service')
+            return
+
+        self.currentClient.pos = self.pos
+        self.currentClient.dst = None
+        self.currentClient.logType = LogType.STANDBY.value if self.pos == self.dst else LogType.INCONVENIENCE.value
+        self.currentClient.currentTaxi = None
+        self.currentClient = None
+        if newDst is not None :
+            self.dst = newDst # logType keeps busy
         else :
-            self.client = 0
-        self.clientLog = 0
+            self.logType = LogType.STANDBY.value
 
-        if dst is not None :
-            if Service.OrphanDestinations :
-                self.destination = Service.OrphanDestinations.pop(0)
-            else :
-                self.destination = Service.NextDestinationId
-                Service.NextDestinationId += 1
+
+
+@dataclass(init = False)
+class Client(Entity) :
+    NextClientId: ClassVar[int] = ord('a')
+    NextDestinationId: ClassVar[int] = ord('A')
+    OrphanClients: ClassVar[list[int]] = []
+    OrphanDestinations: ClassVar[list[int]] = []
+
+    dstId: int = 0
+
+    def __init__(self, origin: Position, destination: Position):
+        if not Client.OrphanClients :
+            self.id = Client.NextClientId
+            Client.NextClientId += 1
         else :
-            self.destination = 0
-        self.destinationPos = dst
+            self.id = Client.OrphanClients.pop(0)
+
+        if not Client.OrphanDestinations :
+            self.dstId = Client.NextDestinationId
+            Client.NextDestinationId += 1
+        else :
+            self.dstId = Client.OrphanDestinations.pop(0)
+
+        self.logType = LogType.WAITING.value
+        self.pos = origin
 
 
-    # Merges a service with one another (substitute all values at least they are empty)
-    def mergeWith(self, other: Service):
-        if other.taxi > 0 :
-            if self.taxi > 0 :
-                Service.OrphanTaxis.append(self.taxi)
-            self.taxi = other.taxi
-
-        if other.client > 0 :
-            if self.client > 0 :
-                Service.OrphanClients.append(self.client)
-            self.client = other.client
-
-        self.destination = other.destination
-        self.destinationPos = other.destinationPos
+    def __del__(self):
+        Client.OrphanClients.append(self.id)
 
 
 class Map :
-    def __init__(self, surface: pygame.Surface, width: int = 20, height: int = 20, *startServices: (Position, Service))
+    def __init__(self, surface: pygame.Surface, width: int = 20, height: int = 20, *entities: Entity):
         self.surface = surface
-        if(width < 2 or height < 2)
+        if(width < 2 or height < 2):
             raise ValueError('Values of the map are too small. Minimums are: width = 2, height = 2')
         self.width = width
         self.height = height
 
-        self.data = []
-        for _ in width * height :
-            self.data.append(None)
-        for pos, srv in startServices :
-            self.setService(pos, srv)
-
+        self.entities = {}
+        self.positionedEntities = {}
+        self.addEntities(entities)
         self.surface = surface
 
-    def _idx(self, p) -> int:
-        return p.x + (p.y * self.width)
-        
 
-    def isInside(self, p: Position)
+    def isInside(self, p: Position):
         return p.x >= 0 and p.x < self.width and p.y >= 0 and p.y <= self.height
 
 
-    def getService(self, p: Position) -> Service | list:
-        return self.data[self._idx(p)] if self.isInside(p) else None
+    def addEntities(self, *entities: Entity):
+        if entities is None : return
+
+        for e in entities :
+            if self.isInside(e.pos) :
+                self.entities[e.id] = e
+                self.positionedEntities[e.pos] = e
+            else :
+                print(f'The entity {e} is not inside the map')
 
 
-    def setService(self, p: Position, srv: Service):
-        if not self.isInside(p):
-            raise ValueError(f'The position {p} is not inside the map. Failed to set taxi service')
-
-        if self.data[self._idx(p)] is None :
-            self.data[self._idx(p)] = srv
-        elif isinstance(self.data[self._idx(p)], Service):
-            self.data[self._idx(p)] = [self.data[self._idx(p)], srv]
+    def getEntity(self, eId: int) -> Entity:
+        if eId in self.entities :
+            return self.entities[eId]
         else :
-            self.data[self._idx(p)].append(srv)
+            return None
+
+
+    def locateEntity(self, p: Position):
+        if p in self.positionedEntities:
+            return self.positionedEntities[p]
+        else :
+            return None
+
+    def removeEntity(*entities: Entity):
+        for e in entities:
+            del self.entities[e.id]
+            del self.positionedEntities[e.pid]
 
 
     def render(self):
@@ -151,11 +213,5 @@ class Map :
 
 
     # Updates (moves) one position one step or finishes a Service (if done)
-    def updateAt(self, p: Position):
-        if(self.isInside(p) and hasattr(self, 'pxUpperCorner') and self.getService(p) is not None \
-                and self.getService(p).taxi > 0 self.getService(p).destinationPos is not None
-        # Position is inside, service is a taxi with an objective, service is not finished
-        # So -> current position re-renders as first list element or empty
-        # -> moves position
-        # -> renders actual position as occupied (maybe getting a representation
+    def update(self, p: Position):
         return 0 # TODO: rewrite any change in positions (see the most elegant way to connect services with map updates)
