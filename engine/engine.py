@@ -1,7 +1,9 @@
 import pygame
 import threading
 from random import randint
+from typing import Callable
 
+from entities import *
 from game_map import *
 
 
@@ -10,50 +12,53 @@ RIGHT_CLICK = 2
 
 MAP_WIDTH = 20
 
-isRunning: bool = False
+isRunning: bool = True
+pointedEntity: Entity = None
 gameMap: GameMap = None
 #ui: UI = None
 
 
-def start():
+def start(socket_app: Callable):
+    global gameMap
+    global isRunning
+    global pointedEntity
+
     pygame.init()
     pygame.font.init()
 
-    global gameMap
     display = pygame.display.set_mode((800,600), pygame.RESIZABLE)
-    gameMap = GameMap(display, MAP_WIDTH, *randEntities(20))
+    gameMap = GameMap(display, MAP_WIDTH)
     gameMap.render()
     #TODO: init ui
 
-    engine = threading.Thread(target=_run_thread)
-    engine.start()
+    # Communication logic
+    client_application = threading.Thread(target=socket_app)
+    client_application.start()
 
-
-def _run_thread():
-    global isRuning
     while True:
         event = pygame.event.wait()
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == LEFT_CLICK:
-                # Make square indicator on the map
+                _processClick(*pygame.mouse.get_pos())
                 pass
-            elif event.button == RIGHT_CLICK:
-                # Send a request to the map
-                pass
-        #TODO: catch pygame resize event
+        elif event.type == Taxi.MoveEvent:
+            pass
+        elif event.type == pygame.VIDEORESIZE:
+            gameMap.resizeDisplay()
         elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-            engineIsRunning = False
+            isRunning = False
             pygame.font.quit()
             pygame.quit()
             exit()
 
+        gameMap.display.fill("black")
         gameMap.render()
         pygame.display.flip()
 
 
 def randPos(mapSideLength: int):
-    return Position(randint(0, mapSideLength -1), randint(0, mapSideLength -1))
+    return Position(randint(1, mapSideLength), randint(1, mapSideLength))
 
 
 def randEntity() -> Entity:
@@ -62,3 +67,13 @@ def randEntity() -> Entity:
 
 def randEntities(n: int) -> list[Entity]:
     return [randEntity() for _ in range(n)]
+
+
+#########################################
+#          INTERNAL FUNCTIONS           #
+#########################################
+
+
+def _processClick(x, y):
+    #TODO
+    pass

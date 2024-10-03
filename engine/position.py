@@ -40,5 +40,8 @@ class Position :
         self.x = p.x + direction.value[M_X]
         self.y = p.y + direction.value[M_Y]
 
+    def toTuple(self):
+        return (self.x, self.y)
+
     def __hash__(self):
         return hash((self.x, self.y))

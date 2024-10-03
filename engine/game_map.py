@@ -3,27 +3,39 @@ import pygame
 
 
 class GameMap :
-    def __init__(self, display: pygame.Surface, mapWidth: int = 20, *entities: Entity):
+    def __init__(self, display: pygame.Surface, width: int = 20, *entities: Entity):
         self.display = display
-        if(mapWidth < 2):
+        if(width < 2):
             raise ValueError('ERROR: cannot instantiate Map. The side length must be 2 at minimum')
-        self.mapWidth = mapWidth
+        self.width = width
 
         self.entities = {}
         self.locatedEntities = {}
         self.addEntities(*entities)
         self.display = display
+        self.resizeDisplay()
+        self.font = pygame.font.Font(pygame.font.get_default_font(), size=int(self.pxboxWidth * 0.7))
 
+
+    def resizeDisplay(self):
         self.pxLoc= Position(
-            (display.get_width() // 3) + 10, 
-            (display.get_width() // 3) * 2.5)
-        self.pxmapWidth = int((display.get_width() // 3) * 1.3)
-        self.pxboxWidth = self.pxmapWidth // self.mapWidth
-        self.font = pygame.font.Font(pygame.font.get_default_font(), size=self.pxboxWidth)
+            (self.display.get_width() / 3) + 10, 
+            (self.display.get_width() / 3) * 0.25)
+        self.pxWidth = (self.display.get_width() / 3) * 1
+        self.pxboxWidth = self.pxWidth / self.width
 
 
     def isInside(self, p: Position):
-        return p.x >= 0 and p.x < self.mapWidth and p.y >= 0 and p.y <= self.mapWidth
+        return p.x >= 1 and p.x < self.width and p.y >= 1 and p.y <= self.width
+
+
+    # Will return None if the pixel position inside is not inside
+    def getBoxLocation(px_x, px_y) -> (int | float, int | float):
+        if px_x < self.pxLoc.x + self.pxboxWidth or px_x > self.pxLoc.x + self.pxWidth \
+                or px_y < self.pxLoc.y + self.pxboxWidth or px_y > self.pxLoc.y + self.pxWidth:
+            return None
+
+        # TODO: finish function, return pxLocation and mapLocation
 
 
     def addEntities(self, *entities: Entity):
@@ -60,24 +72,40 @@ class GameMap :
 
 
     def render(self):
-        for i in range(1, self.mapWidth +1):
-            curNumber = self.font.render(f'{i}', True, "white")
-
+        for i in range(1, self.width +1):
             # Horizontal lines and coordinates
-            startPos = (self.pxLoc.x, self.pxLoc.y + (self.pxboxWidth * i))
-            endPos = (self.pxLoc.x + self.pxmapWidth, self.pxLoc.y + (self.pxboxWidth * i))
-            self.display.blit(curNumber, startPos)
-            pygame.draw.line(self.display, "white", startPos, endPos)
+            self.renderInboxText(f'{i}', self.pxgetPos(i, 0))
+            pygame.draw.line(self.display, "white", self.pxgetPos(0, i), self.pxgetPos(self.width + 1, i))
 
             # Vertical lines and coordinates
-            startPos = (self.pxLoc.x + (self.pxboxWidth * i), self.pxLoc.y)
-            endPos = (self.pxLoc.x + (self.pxboxWidth * i), self.pxLoc.y + self.pxmapWidth)
-            self.display.blit(curNumber, startPos)
-            pygame.draw.line(self.display, "white", startPos, endPos)
+            self.renderInboxText(f'{i}', self.pxgetPos(0, i))
+            pygame.draw.line(self.display, "white", self.pxgetPos(i, 0), self.pxgetPos(i, self.width + 1))
 
-        # Last horizontal line
-        pygame.draw.line(self.display, "white",
-            (self.pxLoc.x, self.pxLoc.y + (self.pxboxWidth * self.mapWidth)), 
-            (self.pxLoc.x + self.pxmapWidth, self.pxLoc.y + (self.mapWidth  * (self.pxboxWidth + 1))))
-        
+        # Last lines to complete map
+        pygame.draw.line(self.display, "white", self.pxgetPos(0, self.width + 1), self.pxgetPos(self.width + 1, self.width + 1))
+        pygame.draw.line(self.display, "white", self.pxgetPos(self.width + 1, 0), self.pxgetPos(self.width + 1, self.width + 1))
+
         #TODO: draw placed elements
+
+
+    def pxgetPos(self, x: int | float, y: int | float) -> tuple:
+        return (self.pxLoc.x + (self.pxboxWidth * x), self.pxLoc.y + (self.pxboxWidth * y))
+
+
+    def renderInboxText(self, txt: str, pxPos: tuple[int | float, int | float], color = None, backgroundColor = None):
+        if color is None:
+            color = "white"
+        
+        charSize = self.font.size(txt)
+        xoffset = (self.pxboxWidth - charSize[0]) / 2
+        yoffset = (self.pxboxWidth - charSize[1]) / 2
+
+        if backgroundColor is not None:
+            txtToRender = pygame.Surface((self.pxBoxWidth, self.pxBoxWidth))
+            txtToRender.fill(backgroundColor)
+            txtToRender.blit(self.font.render(txt, True, color), (xoffset, yoffset))
+            self.display.blit(self.font.render(txt, True, color), pxPos)
+        else:
+            txtToRender = self.font.render(txt, True, color)
+            self.display.blit(txtToRender, (pxPos[0] + xoffset, pxPos[1] + yoffset))
+

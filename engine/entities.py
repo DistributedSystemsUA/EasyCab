@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import ClassVar
 from position import *
+import pygame
 
 
 class LogType(Enum):
@@ -23,6 +24,7 @@ class Entity :
 class Taxi(Entity) :
     NextTaxiId: ClassVar[int] = 1
     OrphanTaxis: ClassVar[list[int]] = []
+    MoveEvent: ClassVar[int] = pygame.event.custom_type()
 
     currentClient: Client = None
 
@@ -43,9 +45,10 @@ class Taxi(Entity) :
 
 
     def move(self):
-        if dst is None: return
+        if self.dst is None: return
+        if self.logType == LogType.INCONVENIENCE.value:
+            self.logType == LogType.BUSY.value
 
-        unrenderP = Position(self.pos.x, self.pos.y)
         self.pos.moveTo(self.dst)
         if self.pos == self.dst :
             if self.currentClient is not None:
@@ -58,6 +61,11 @@ class Taxi(Entity) :
             else :
                 self.dst = None
                 self.logType = LogType.STANDBY.value
+        pygame.event.post(Event(Taxi.MoveEvent))
+
+
+    def stop(self):
+        self.logType = LogType.INCONVENIENCE.value
 
 
     def aquireClient(self, c: Client):
@@ -66,6 +74,8 @@ class Taxi(Entity) :
             return
 
         c.currentTaxi = self
+        c.pos = None # No render position while in Taxi
+        c.pos = None
         c.logType = LogType.WAITING.value
         self.currentClient = c
         self.logType = LogType.WAITING.value
