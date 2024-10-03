@@ -25,6 +25,7 @@ class Taxi(Entity) :
     NextTaxiId: ClassVar[int] = 1
     OrphanTaxis: ClassVar[list[int]] = []
     MoveEvent: ClassVar[int] = pygame.event.custom_type()
+    SenderIndex: ClassVar[int] = 1 # TODO: add the sender whose position must be in the map's location
 
     currentClient: Client = None
 
@@ -61,7 +62,7 @@ class Taxi(Entity) :
             else :
                 self.dst = None
                 self.logType = LogType.STANDBY.value
-        pygame.event.post(Event(Taxi.MoveEvent))
+        pygame.event.post(Event(Taxi.MoveEvent)) # TODO: add the SenderIndex param with the sender
 
 
     def stop(self):

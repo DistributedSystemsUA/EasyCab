@@ -35,7 +35,7 @@ class GameMap :
                 or px_y < self.pxLoc.y + self.pxboxWidth or px_y > self.pxLoc.y + self.pxWidth:
             return None
 
-        # TODO: finish function, return pxLocation and mapLocation
+        # TODO: finish function, return pxLocation
 
 
     def addEntities(self, *entities: Entity):
@@ -62,7 +62,7 @@ class GameMap :
     def locateEntities(self, p: Position) -> list[Entity]:
         if self.locatedEntities.get(p) is None:
             return None
-        return self.locatedEntities.get
+        return self.locatedEntities.get(p)
 
 
     def removeEntity(*entities: Entity):
@@ -85,7 +85,16 @@ class GameMap :
         pygame.draw.line(self.display, "white", self.pxgetPos(0, self.width + 1), self.pxgetPos(self.width + 1, self.width + 1))
         pygame.draw.line(self.display, "white", self.pxgetPos(self.width + 1, 0), self.pxgetPos(self.width + 1, self.width + 1))
 
-        #TODO: draw placed elements
+        for _, e in entities:
+            entityColor = "yellow" # Client color by default
+            entityTxt = f'{e.id}'
+            if isinstance(e, Taxi):
+                entityColor = ["red", "green", "green", "red"][e.logType.value]
+                entityTxt += f'{e.currentClient.id}' if e.currentClient is not None else ''
+            elif e.dst is not None:
+                self.renderInboxText(f'{e.dstId}', e.dst.toTuple(), "black", entityColor) # Render client's destination
+
+            self.renderInboxText(entityTxt, e.pos.toTuple(), "black", entityColor)
 
 
     def pxgetPos(self, x: int | float, y: int | float) -> tuple:
