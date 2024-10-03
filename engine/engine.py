@@ -19,6 +19,7 @@ def start():
     pygame.init()
     pygame.font.init()
 
+    global gameMap
     display = pygame.display.set_mode((800,600), pygame.RESIZABLE)
     gameMap = GameMap(display, MAP_WIDTH, *randEntities(20))
     gameMap.render()
@@ -29,6 +30,7 @@ def start():
 
 
 def _run_thread():
+    global isRuning
     while True:
         event = pygame.event.wait()
 
@@ -45,6 +47,9 @@ def _run_thread():
             pygame.font.quit()
             pygame.quit()
             exit()
+
+        gameMap.render()
+        pygame.display.flip()
 
 
 def randPos(mapSideLength: int):

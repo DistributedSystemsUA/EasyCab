@@ -11,19 +11,19 @@ class GameMap :
 
         self.entities = {}
         self.locatedEntities = {}
-        self.addEntities(entities)
+        self.addEntities(*entities)
         self.display = display
 
         self.pxLoc= Position(
             (display.get_width() // 3) + 10, 
             (display.get_width() // 3) * 2.5)
-        self.sidepxLength = int((display.get_width() // 3) * 1.3)
-        self.boxpxLength = self.sidepxLength // self.mapWidth
-        self.font = pygame.font.Font(pygame.font.get_default_font(), size=boxpxLength)
+        self.pxmapWidth = int((display.get_width() // 3) * 1.3)
+        self.pxboxWidth = self.pxmapWidth // self.mapWidth
+        self.font = pygame.font.Font(pygame.font.get_default_font(), size=self.pxboxWidth)
 
 
     def isInside(self, p: Position):
-        return p.x >= 0 and p.x < self.width and p.y >= 0 and p.y <= self.height
+        return p.x >= 0 and p.x < self.mapWidth and p.y >= 0 and p.y <= self.mapWidth
 
 
     def addEntities(self, *entities: Entity):
@@ -64,20 +64,20 @@ class GameMap :
             curNumber = self.font.render(f'{i}', True, "white")
 
             # Horizontal lines and coordinates
-            startPos = (self.pxLoc.x, self.pxLoc.y + (self.boxpxLength * i))
-            endPos = (self.pxLoc.x + self.sidepxLength, self.pxLoc.y + (self.boxpxLength * i))
+            startPos = (self.pxLoc.x, self.pxLoc.y + (self.pxboxWidth * i))
+            endPos = (self.pxLoc.x + self.pxmapWidth, self.pxLoc.y + (self.pxboxWidth * i))
             self.display.blit(curNumber, startPos)
             pygame.draw.line(self.display, "white", startPos, endPos)
 
             # Vertical lines and coordinates
-            startPos = (self.pxLoc.x + (self.boxpxLength * i), self.pxLoc.y)
-            endPos = (self.pxLoc.x + (self.boxpxLength * i), self.pxLoc.y + self.sidepxLength)
+            startPos = (self.pxLoc.x + (self.pxboxWidth * i), self.pxLoc.y)
+            endPos = (self.pxLoc.x + (self.pxboxWidth * i), self.pxLoc.y + self.pxmapWidth)
             self.display.blit(curNumber, startPos)
             pygame.draw.line(self.display, "white", startPos, endPos)
 
         # Last horizontal line
-        pygame.draw.line(self.display, "white", (self.pxLoc.x, self.pxLoc.y + (self.boxpxLength * self.mapWidth)))
+        pygame.draw.line(self.display, "white",
+            (self.pxLoc.x, self.pxLoc.y + (self.pxboxWidth * self.mapWidth)), 
+            (self.pxLoc.x + self.pxmapWidth, self.pxLoc.y + (self.mapWidth  * (self.pxboxWidth + 1))))
         
         #TODO: draw placed elements
-
-        self.display.flip() # TODO: probably get out to be able to render ui
