@@ -41,7 +41,6 @@ def start(socket_app: Callable):
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == LEFT_CLICK:
                 _processClick(*pygame.mouse.get_pos())
-                pass
         elif event.type == Taxi.MoveEvent:
             # TODO: update the position on the map's dictionary to overlap (if necessary) with more positions
             # IMPORTANT: always read the last element of the overlapped position list in the dictionary entrance
@@ -50,13 +49,11 @@ def start(socket_app: Callable):
         elif event.type == pygame.VIDEORESIZE:
             gameMap.resizeDisplay()
         elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-            isRunning = False
-            pygame.font.quit()
-            pygame.quit()
-            exit()
+            _closeApplication()
 
         gameMap.display.fill("black")
         gameMap.render()
+        _drawEntityPointer()
         pygame.display.flip()
 
 
@@ -78,5 +75,23 @@ def randEntities(n: int) -> list[Entity]:
 
 
 def _processClick(x, y):
-    #TODO
-    pass
+    loc = gameMap.getBoxLoc(x, y)
+    if loc is not None:
+        pointedEntity = gameMap.locateEntities(Position(loc[0], loc[1])[0]
+    else:
+        pointedEntity = None
+        # TODO: manage if mouse pointed to the ui
+
+def _drawEntityPointer():
+    if pointedEntity == None:
+        return
+    else:
+        pass # TODO: draw entity pointer with thin rectangles
+
+
+# TODO: this close call includes: socket kill call, kafka end of service call
+def _closeApplication():
+    isRunning = False
+    pygame.font.quit()
+    pygame.quit()
+    exit()

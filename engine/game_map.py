@@ -29,13 +29,13 @@ class GameMap :
         return p.x >= 1 and p.x < self.width and p.y >= 1 and p.y <= self.width
 
 
-    # Will return None if the pixel position inside is not inside
-    def getBoxLocation(px_x, px_y) -> (int | float, int | float):
+    # Will return None if the pixel position is not inside
+    def getBoxLoc(px_x, px_y) -> (int, int):
         if px_x < self.pxLoc.x + self.pxboxWidth or px_x > self.pxLoc.x + self.pxWidth \
                 or px_y < self.pxLoc.y + self.pxboxWidth or px_y > self.pxLoc.y + self.pxWidth:
             return None
 
-        # TODO: finish function, return pxLocation
+        return (math.floor(px_x - self.pxLoc.x), math.floor(px_y - self.pxLoc.y))
 
 
     def addEntities(self, *entities: Entity):
@@ -85,7 +85,7 @@ class GameMap :
         pygame.draw.line(self.display, "white", self.pxgetPos(0, self.width + 1), self.pxgetPos(self.width + 1, self.width + 1))
         pygame.draw.line(self.display, "white", self.pxgetPos(self.width + 1, 0), self.pxgetPos(self.width + 1, self.width + 1))
 
-        for _, e in entities:
+        for _, e in self.entities:
             entityColor = "yellow" # Client color by default
             entityTxt = f'{e.id}'
             if isinstance(e, Taxi):
