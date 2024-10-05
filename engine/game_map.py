@@ -1,4 +1,5 @@
 from entities import *
+import math
 import pygame
 
 
@@ -26,11 +27,11 @@ class GameMap :
 
 
     def isInside(self, p: Position):
-        return p.x >= 1 and p.x < self.width and p.y >= 1 and p.y <= self.width
+        return p.x >= 1 and p.x <= self.width and p.y >= 1 and p.y <= self.width
 
 
     # Will return None if the pixel position is not inside
-    def getBoxLoc(px_x, px_y) -> (int, int):
+    def getBoxLoc(self, px_x, px_y) -> (int, int):
         if px_x < self.pxLoc.x + self.pxboxWidth or px_x > self.pxLoc.x + self.pxWidth \
                 or px_y < self.pxLoc.y + self.pxboxWidth or px_y > self.pxLoc.y + self.pxWidth:
             return None
@@ -84,17 +85,28 @@ class GameMap :
         # Last lines to complete map
         pygame.draw.line(self.display, "white", self.pxgetPos(0, self.width + 1), self.pxgetPos(self.width + 1, self.width + 1))
         pygame.draw.line(self.display, "white", self.pxgetPos(self.width + 1, 0), self.pxgetPos(self.width + 1, self.width + 1))
+        
+        for _, e in self.entities.items():
+            self.renderEntity(e)
 
-        for _, e in self.entities:
-            entityColor = "yellow" # Client color by default
-            entityTxt = f'{e.id}'
-            if isinstance(e, Taxi):
-                entityColor = ["red", "green", "green", "red"][e.logType.value]
-                entityTxt += f'{e.currentClient.id}' if e.currentClient is not None else ''
-            elif e.dst is not None:
-                self.renderInboxText(f'{e.dstId}', e.dst.toTuple(), "black", entityColor) # Render client's destination
 
-            self.renderInboxText(entityTxt, e.pos.toTuple(), "black", entityColor)
+    def renderEntity(self, e: Entity):
+        if e.pos is None:
+            return
+
+        entityColor = "yellow" # Client color by default
+        entityTxt = f'{e.id}'
+        if isinstance(e, Taxi):
+            entityColor = ["red", "green", "green", "red"][e.logType]
+            if e.currentClient is not None:
+                entityTxt += f'{chr(e.currentClient.id)}'
+                self.renderInboxText(f'{chr(e.currentClient.dstId)}', self.pxgetPos(*e.currentClient.dst.toTuple()), "black", "blue")
+        else:
+            entityTxt = f'{chr(e.id)}'
+            if e.dst is not None:
+                self.renderInboxText(f'{chr(e.dstId)}', self.pxgetPos(*e.dst.toTuple()), "black", "blue")
+
+        self.renderInboxText(entityTxt, self.pxgetPos(*e.pos.toTuple()), "black", entityColor)
 
 
     def pxgetPos(self, x: int | float, y: int | float) -> tuple:
@@ -109,11 +121,13 @@ class GameMap :
         xoffset = (self.pxboxWidth - charSize[0]) / 2
         yoffset = (self.pxboxWidth - charSize[1]) / 2
 
-        if backgroundColor is not None:
-            txtToRender = pygame.Surface((self.pxBoxWidth, self.pxBoxWidth))
+        if backgroundColor is not None: # The render is a block
+            blockOffset = 0.03
+            pxPos = (pxPos[0] + (self.pxboxWidth * blockOffset), pxPos[1] + (self.pxboxWidth * blockOffset)) # TODO: Regulate this
+            txtToRender = pygame.Surface((self.pxboxWidth, self.pxboxWidth))
             txtToRender.fill(backgroundColor)
             txtToRender.blit(self.font.render(txt, True, color), (xoffset, yoffset))
-            self.display.blit(self.font.render(txt, True, color), pxPos)
+            self.display.blit(txtToRender, pxPos)
         else:
             txtToRender = self.font.render(txt, True, color)
             self.display.blit(txtToRender, (pxPos[0] + xoffset, pxPos[1] + yoffset))

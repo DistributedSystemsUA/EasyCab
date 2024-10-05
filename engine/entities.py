@@ -29,7 +29,7 @@ class Taxi(Entity) :
 
     currentClient: Client = None
 
-    def __init__(self, origin: Position, dst: Position = 0):
+    def __init__(self, origin: Position, dst: Position = None):
         if not Taxi.OrphanTaxis :
             self.id = Taxi.NextTaxiId
             Taxi.NextTaxiId += 1
@@ -69,10 +69,9 @@ class Taxi(Entity) :
         self.logType = LogType.INCONVENIENCE.value
 
 
-    def aquireClient(self, c: Client):
-        if c is None or self.currentClient is not None :
-            print(f'ERROR: the taxi {self.id} can\'t aquire a new client because is carrying {self.currentClient}')
-            return
+    def aquireClient(self, c: Client) -> bool:
+        if c is None or c.dst is None or self.currentClient is not None:
+            return False
 
         c.currentTaxi = self
         c.pos = None # No render position while in Taxi
@@ -81,12 +80,13 @@ class Taxi(Entity) :
         self.currentClient = c
         self.logType = LogType.WAITING.value
         self.dst = c.pos
+        
+        return True
 
 
-    def finishService(self, newDst: Position = None):
+    def finishService(self, newDst: Position = None) -> bool:
         if self.currentClient is None :
-            print(f'ERROR: the taxi {self.id} is not being used, can\'t finish service')
-            return
+            return False
 
         self.currentClient.pos = self.pos
         self.currentClient.dst = None
@@ -109,7 +109,7 @@ class Client(Entity) :
 
     dstId: int = 0
 
-    def __init__(self, origin: Position, destination: Position):
+    def __init__(self, origin: Position, destination: Position = None):
         if not Client.OrphanClients :
             self.id = Client.NextClientId
             Client.NextClientId += 1
@@ -122,8 +122,9 @@ class Client(Entity) :
         else :
             self.dstId = Client.OrphanDestinations.pop(0)
 
-        self.logType = LogType.WAITING.value
+        self.logType = LogType.STANDBY.value
         self.pos = origin
+        self.dst = destination
 
     def __del__(self):
         self.OrphanClients.append(self.id)

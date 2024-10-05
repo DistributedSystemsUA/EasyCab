@@ -28,10 +28,12 @@ def start(socket_app: Callable):
 
     display = pygame.display.set_mode((800,600), pygame.RESIZABLE)
     gameMap = GameMap(display, MAP_WIDTH)
-    gameMap.render()
     #TODO: init ui
 
-    # Communication logic
+    gameMap.addEntities(*randEntities(10)) # TODO: remove this
+    gameMap.render()
+    pygame.display.flip()
+
     client_application = threading.Thread(target=socket_app)
     client_application.start()
 
@@ -46,6 +48,7 @@ def start(socket_app: Callable):
             # IMPORTANT: always read the last element of the overlapped position list in the dictionary entrance
             # maybe make a function _handleMove
             pass
+        # TODO: create an event to make operations with Taxis
         elif event.type == pygame.VIDEORESIZE:
             gameMap.resizeDisplay()
         elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
@@ -77,7 +80,7 @@ def randEntities(n: int) -> list[Entity]:
 def _processClick(x, y):
     loc = gameMap.getBoxLoc(x, y)
     if loc is not None:
-        pointedEntity = gameMap.locateEntities(Position(loc[0], loc[1])[0]
+        pointedEntity = gameMap.locateEntities(Position(loc[0], loc[1]))[0]
     else:
         pointedEntity = None
         # TODO: manage if mouse pointed to the ui
@@ -91,6 +94,7 @@ def _drawEntityPointer():
 
 # TODO: this close call includes: socket kill call, kafka end of service call
 def _closeApplication():
+    global isRunning
     isRunning = False
     pygame.font.quit()
     pygame.quit()
