@@ -30,7 +30,6 @@ def start(socket_app: Callable):
     gameMap = GameMap(display, MAP_WIDTH)
     #TODO: init ui
 
-    gameMap.addEntities(*randEntities(10)) # TODO: remove this
     gameMap.render()
     pygame.display.flip()
 
@@ -48,7 +47,7 @@ def start(socket_app: Callable):
             # IMPORTANT: always read the last element of the overlapped position list in the dictionary entrance
             # maybe make a function _handleMove
             pass
-        # TODO: create an event to make operations with Taxis
+        # TODO: create an event to make operations with Taxis to update data structures if needed
         elif event.type == pygame.VIDEORESIZE:
             gameMap.resizeDisplay()
         elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):

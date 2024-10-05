@@ -22,7 +22,7 @@ class Position :
     y: int = 0
 
     def moveTo(self, dst: Position):
-        direction = (0,0)
+        direction = [0,0]
         if dst.x > self.x :
             direction[M_X] = 1
         elif dst.x < self.x :
@@ -33,8 +33,8 @@ class Position :
         elif dst.y < self.y :
             direction[M_Y] = -1
         
-        self.x = direction[M_X]
-        self.y = direction[M_Y]
+        self.x += direction[M_X]
+        self.y += direction[M_Y]
 
     def pivot(self, p: Position, direction: Move):
         self.x = p.x + direction.value[M_X]
