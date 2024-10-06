@@ -62,7 +62,7 @@ class Taxi(Entity) :
             else :
                 self.dst = None
                 self.logType = LogType.STANDBY.value
-        pygame.event.post(pygame.event.Event(Taxi.MoveEvent)) # TODO: add the SenderIndex param with the sender
+        pygame.event.post(pygame.event.Event(Taxi.MoveEvent)) # TODO: add the SenderIndex param with the sender and another parameter to delete the old position
 
 
     def stop(self):

@@ -8,7 +8,7 @@ from game_map import *
 
 
 LEFT_CLICK = 1
-RIGHT_CLICK = 2
+RIGHT_CLICK = 3
 
 MAP_WIDTH = 20
 
@@ -55,7 +55,7 @@ def start(socket_app: Callable):
 
         gameMap.display.fill("black")
         gameMap.render()
-        _drawEntityPointer()
+        _drawEntityPointer(display)
         pygame.display.flip()
 
 
@@ -78,17 +78,45 @@ def randEntities(n: int) -> list[Entity]:
 
 def _processClick(x, y):
     loc = gameMap.getBoxLoc(x, y)
-    if loc is not None:
-        pointedEntity = gameMap.locateEntities(Position(loc[0], loc[1]))[0]
+    if loc is not None and (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
+        pointedEntity = l[0]
+        if not isinstance(pointedEntity, Taxi):
+            for i in range(1,len(l)):
+                if isinstance(l[i], Taxi):
+                    pointedEntity = l[i]
+                    break
     else:
         pointedEntity = None
-        # TODO: manage if mouse pointed to the ui
+        # TODO: manage if mouse pointed to the ui (at right, where the buttons will be)
 
-def _drawEntityPointer():
-    if pointedEntity == None:
-        return
-    else:
-        pass # TODO: draw entity pointer with thin rectangles
+
+def _drawEntityPointer(display: pygame.Surface):
+    if pointedEntity is not None:
+        pxbaseLoc = gameMap.pxgetPos(*pointedEntity.pos.toTuple())
+        cursorOffset = gameMap.pxboxWidth * 0.1
+        pxbaseLoc[0] -= cursorOffset
+        pxbaseLoc[1] -= cursorOffset
+        pxLength = gameMap.pxboxWidth * 0.3
+        pxWidth = gameMap.pxboxWidth * 0.03
+        lightBlue = (255, 200, 200)
+
+        pygame.draw.rect(display, lightBlue, pygame.Rect(pxbaseLoc, (pxLength, pxWidth)))
+        pygame.draw.rect(display, lightBlue, pygame.Rect(pxbaseLoc, (pxWidth, pxLength)))
+
+        pygame.draw.rect(display, lightBlue, pygame.Rect(
+            pxbaseLoc[0], pxbaseLoc[1] + gameMap.pxboxWidth + (2 * cursorOffset) - pxLength, pxWidth, pxLength))
+        pygame.draw.rect(display, lightBlue, pygame.Rect(
+            pxbaseLoc[0], pxBaseLoc[1] + gameMap.pxboxWidth + (2 * cursorOffset) - pxWidth, pxLength, pxWidth))
+
+        pygame.draw.rect(display, lightBlue, pygame.Rect(
+            pxbaseLoc[0] + gameMap.pxBoxWidth + (2 * cursorOffset) - pxLength, pxbaseLoc[1], pxLength, pxWidth))
+        pygame.draw.rect(display, lightBlue, pygame.Rect(
+            pxbaseLoc[0] + gameMap.pxBoxWidth + (2 * cursorOffset) - pxWidth, pxbaseLoc[1], pxWidth, pxLength))
+
+        pygame.draw.rect(display, lightBlue, pygame.Rect(
+            pxbaseLoc[0] + gameMap.pxBoxWidth + (2 * cursorOffset) - pxWidth, pxbaseLoc[1] + gameMap.pxboxWidth + (2 * cursorOffset) - pxLength, pxWidth, pxLength))
+        pygame.draw.rect(display, lightBlue, pygame.Rect(
+            pxbaseLoc[0] + gameMap.pxboxWidth + (2 * cursorOffset) - pxLength, pxbaseLoc[1] + gameMap.pxboxWidth + (2 * cursorOffset) - pxWidth, pxLength, pxWidth))
 
 
 # TODO: this close call includes: socket kill call, kafka end of service call

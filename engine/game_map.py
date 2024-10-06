@@ -36,7 +36,7 @@ class GameMap :
                 or px_y < self.pxLoc.y + self.pxboxWidth or px_y > self.pxLoc.y + self.pxWidth:
             return None
 
-        return (math.floor(px_x - self.pxLoc.x), math.floor(px_y - self.pxLoc.y))
+        return (math.floor((px_x - self.pxLoc.x) / self.pxboxWidth), math.floor((px_y - self.pxLoc.y) / self.pxboxWidth))
 
 
     def addEntities(self, *entities: Entity):
