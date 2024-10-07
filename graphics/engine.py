@@ -43,11 +43,8 @@ def start(socket_app: Callable):
             if event.button == LEFT_CLICK:
                 _processClick(*pygame.mouse.get_pos())
         elif event.type == Taxi.MoveEvent:
-            # TODO: update the position on the map's dictionary to overlap (if necessary) with more positions
-            # IMPORTANT: always read the last element of the overlapped position list in the dictionary entrance
-            # maybe make a function _handleMove
+            gameMap.relocateEntity(event.taxi, event.oldPos) # TODO: make it readable
             pass
-        # TODO: create an event to make operations with Taxis to update data structures if needed
         elif event.type == pygame.VIDEORESIZE:
             gameMap.resizeDisplay()
         elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):

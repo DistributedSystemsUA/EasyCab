@@ -53,6 +53,19 @@ class GameMap :
                 print(f'The entity {e} is not inside the map')
 
 
+    def relocateEntity(self, e: Entity, oldPos: Position = None) -> bool:
+        if self.isInside(e.pos):
+            if self.locatedEntities.get(e.pos) is None:
+                self.locatedEntities[e.pos] = [e]
+            else:
+                self.locatedEntities[e.pos].append(e)
+
+            if oldPos is not None and (e_list := self.locatedEntities.get(oldPos)) is not None and e in e_list:
+                del e_list[e_list.index(e)]
+
+        return False
+
+
     def getEntity(self, eId: int) -> Entity:
         if eId in self.entities :
             return self.entities[eId]

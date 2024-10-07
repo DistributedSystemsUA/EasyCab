@@ -25,7 +25,6 @@ class Taxi(Entity) :
     NextTaxiId: ClassVar[int] = 1
     OrphanTaxis: ClassVar[list[int]] = []
     MoveEvent: ClassVar[int] = pygame.event.custom_type()
-    SenderIndex: ClassVar[int] = 1 # TODO: add the sender whose position must be in the map's location
 
     currentClient: Client = None
 
@@ -50,6 +49,7 @@ class Taxi(Entity) :
         if self.logType == LogType.INCONVENIENCE.value:
             self.logType == LogType.BUSY.value
 
+        oldPosition = Position(self.pos.x, self.pos.y)
         self.pos.moveTo(self.dst)
         if self.pos == self.dst :
             if self.currentClient is not None:
@@ -62,7 +62,7 @@ class Taxi(Entity) :
             else :
                 self.dst = None
                 self.logType = LogType.STANDBY.value
-        pygame.event.post(pygame.event.Event(Taxi.MoveEvent)) # TODO: add the SenderIndex param with the sender and another parameter to delete the old position
+        pygame.event.post(pygame.event.Event(Taxi.MoveEvent), {"taxi" : self, "oldPosition" : oldPosition})
 
 
     def stop(self):
@@ -75,7 +75,6 @@ class Taxi(Entity) :
 
         c.currentTaxi = self
         c.pos = None # No render position while in Taxi
-        c.pos = None
         c.logType = LogType.WAITING.value
         self.currentClient = c
         self.logType = LogType.WAITING.value
