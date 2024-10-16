@@ -43,8 +43,7 @@ def start(socket_app: Callable):
             if event.button == LEFT_CLICK:
                 _processClick(*pygame.mouse.get_pos())
         elif event.type == Taxi.MoveEvent:
-            gameMap.relocateEntity(event.taxi, event.oldPos) # TODO: make it readable
-            pass
+            gameMap.relocateEntity(event.taxi, event.oldPos)
         elif event.type == pygame.VIDEORESIZE:
             gameMap.resizeDisplay()
         elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):

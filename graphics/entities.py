@@ -62,7 +62,7 @@ class Taxi(Entity) :
             else :
                 self.dst = None
                 self.logType = LogType.STANDBY.value
-        pygame.event.post(pygame.event.Event(Taxi.MoveEvent), {"taxi" : self, "oldPosition" : oldPosition})
+        pygame.event.post(pygame.event.Event(Taxi.MoveEvent, {"taxi" : self, "oldPos" : oldPosition}))
 
 
     def stop(self):
