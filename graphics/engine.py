@@ -73,14 +73,13 @@ def randEntities(n: int) -> list[Entity]:
 
 
 def _processClick(x, y):
+    global pointedEntity
     loc = gameMap.getBoxLoc(x, y)
     if loc is not None and (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
-        pointedEntity = l[0]
-        if not isinstance(pointedEntity, Taxi):
-            for i in range(1,len(l)):
-                if isinstance(l[i], Taxi):
-                    pointedEntity = l[i]
-                    break
+        for e in l:
+            if isinstance(e, Taxi):
+                pointedEntity = e
+                break
     else:
         pointedEntity = None
         # TODO: manage if mouse pointed to the ui (at right, where the buttons will be)
