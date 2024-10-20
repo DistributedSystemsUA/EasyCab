@@ -15,15 +15,17 @@ class GameMap :
         self.addEntities(*entities)
         self.display = display
         self.resizeDisplay()
-        self.font = pygame.font.Font(pygame.font.get_default_font(), size=int(self.pxboxWidth * 0.7))
 
 
     def resizeDisplay(self):
+        self.pxWidth = (self.display.get_width() / 3) * 1
+        self.pxboxWidth = self.pxWidth / (self.width +1) # +1 for position marker boxes
+
         self.pxLoc= Position(
             (self.display.get_width() / 3) + 10, 
-            (self.display.get_width() / 3) * 0.25)
-        self.pxWidth = (self.display.get_width() / 3) * 1
-        self.pxboxWidth = self.pxWidth / self.width
+            (self.display.get_height() / 2) - (self.pxWidth / 2))
+
+        self.font = pygame.font.Font(pygame.font.get_default_font(), size=int(self.pxboxWidth * 0.7))
 
 
     def isInside(self, p: Position):
@@ -99,7 +101,14 @@ class GameMap :
         pygame.draw.line(self.display, "white", self.pxgetPos(0, self.width + 1), self.pxgetPos(self.width + 1, self.width + 1))
         pygame.draw.line(self.display, "white", self.pxgetPos(self.width + 1, 0), self.pxgetPos(self.width + 1, self.width + 1))
         
+        renderPriorities = []
         for _, e in self.entities.items():
+            if isinstance(e, Taxi):
+                renderPriorities.append(e)
+                continue
+            self.renderEntity(e)
+
+        for e in renderPriorities:
             self.renderEntity(e)
 
 

@@ -1,3 +1,5 @@
+from path_load import * # Just path load for module loading
+
 import engine
 import time
 
