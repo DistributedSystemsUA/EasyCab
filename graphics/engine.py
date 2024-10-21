@@ -15,22 +15,25 @@ MAP_WIDTH = 20
 isRunning: bool = True
 pointedEntity: Entity = None
 gameMap: GameMap = None
-#ui: UI = None
+uiFont: pygame.font.Font = None
+entityButtons: list[pygame.Rect] = []
 
 
 def start(socket_app: Callable):
     global gameMap
     global isRunning
     global pointedEntity
+    global uiFont
 
     pygame.init()
     pygame.font.init()
 
     display = pygame.display.set_mode((800,600), pygame.RESIZABLE)
     gameMap = GameMap(display, MAP_WIDTH)
+    uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
 
     gameMap.render()
-    _uidraw(display)
+    _drawui(display)
     pygame.display.flip()
 
     client_application = threading.Thread(target=socket_app)
@@ -51,7 +54,7 @@ def start(socket_app: Callable):
 
         gameMap.display.fill("black")
         gameMap.render()
-        _uidraw(display)
+        _drawui(display)
         _drawEntityPointer(display)
         pygame.display.flip()
 
@@ -61,7 +64,9 @@ def randPos(mapSideLength: int):
 
 
 def randEntity() -> Entity:
-    return Taxi(randPos(MAP_WIDTH), randPos(MAP_WIDTH)) if randint(0,1) == 0 else Client(randPos(MAP_WIDTH), randPos(MAP_WIDTH))
+    t = Taxi(randPos(MAP_WIDTH), randPos(MAP_WIDTH)) if randint(0,1) == 0 else Client(randPos(MAP_WIDTH), randPos(MAP_WIDTH))
+    t.logType = LogType.WAITING.value
+    return t
 
 
 def randEntities(n: int) -> list[Entity]:
@@ -76,6 +81,7 @@ def randEntities(n: int) -> list[Entity]:
 def _processClick(x, y):
     global pointedEntity
     loc = gameMap.getBoxLoc(x, y)
+
     if loc is not None and (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
         isTaxi = False
         for e in l:
@@ -124,29 +130,86 @@ def _drawEntityPointer(display: pygame.Surface):
         pxbaseLoc[0] + gameMap.pxboxWidth + cursorOffset - pxLength, pxbaseLoc[1] + gameMap.pxboxWidth + cursorOffset - pxWidth, pxLength, pxWidth))
 
 
-def _uidraw(display: pygame.Surface):
+def _drawui(display: pygame.Surface):
     global gameMap
     global pointedEntity
 
-    # TODO: left -> map info, right -> pointedEntity info and buttons
-    # TODO: left -> map info, right -> pointedEntity info and buttons
-    pxuiLoc = (display.get_width() * 0.05, display.get_height() * 0.1)
-    pxuiWidth = gameMap.pxLoc.x - pxuiLoc[0] - (display.get_width() * 0.05)
+    pxuiLoc = (display.get_width() * 0.02, display.get_height() * 0.1)
+    pxuiWidth = gameMap.pxLoc.x - pxuiLoc[0] - (display.get_width() * 0.02)
 
-    # TODO: make text box ui
+    _renderTxtBox(display, *pxuiLoc, pxuiWidth, gameMap.pxboxWidth, (1, "*** Easy CAB Release 1 ***", "white"))
+    pxuiLeftLoc = [pxuiLoc[0], pxuiLoc[1] + gameMap.pxboxWidth]
+    pxuiRightLoc = [pxuiLoc[0] + (pxuiWidth * 0.5), pxuiLoc[1] + (gameMap.pxboxWidth * 2)]
+    _renderTxtBox(display, *pxuiLeftLoc, pxuiWidth, gameMap.pxboxWidth, (0.5, "Taxis", "white"), (1, "Clientes", "white"))
+    pxuiLeftLoc[1] += gameMap.pxboxWidth
+
+    propertiesBox = ((0.2, "Id.", "white"), (0.5, "Destino", "white"), (1, "Estado", "white"))
+    _renderTxtBox(display, *pxuiLeftLoc, pxuiWidth / 2, gameMap.pxboxWidth, *propertiesBox)
+    _renderTxtBox(display, *pxuiRightLoc, pxuiWidth / 2, gameMap.pxboxWidth, *propertiesBox)
+    pxuiLeftLoc[1] += gameMap.pxboxWidth
+    pxuiRightLoc[1] += gameMap.pxboxWidth
+
+    for e in gameMap.entities.values():
+        if isinstance(e, Taxi):
+            if e.logType == LogType.INCONVENIENCE.value:
+                curColor = "red"
+                curLogHead = "KO."
+            else:
+                curColor = "white"
+                curLogHead = "OK."
+
+            if e.currentClient != None:
+                if e.currentClient.dst == e.dst:
+                    curDst = chr(e.currentClient.dstId)
+                else:
+                    curDst = chr(e.currentClient.id)
+                curLogHead += " Servicio " + curDst
+            elif e.logType in [LogType.WAITING.value, LogType.BUSY.value]:
+                curLogHead += " servir base"
+                curDst = f"({e.dst.x},{e.dst.y})"
+            else:
+                curLogHead += " Parado"
+                curDst = "-"
+
+            entityInfo = ((0.2, str(e.id), curColor), (0.5, curDst, curColor), (1, curLogHead, curColor))
+            _renderTxtBox(display, *pxuiLeftLoc, pxuiWidth / 2, gameMap.pxboxWidth, *entityInfo)
+            pxuiLeftLoc[1] += gameMap.pxboxWidth
+        else:
+            curLogHead = "OK."
+            if e.currentTaxi is not None:
+                curLogHead += " Taxi " + str(e.currentTaxi.id)
+            entityInfo = ((0.2, chr(e.id), "white"), (0.5, chr(e.dstId if e.dst is not None else "-"), "white"), (1, curLogHead, "white"))
+            _renderTxtBox(display, *pxuiRightLoc, pxuiWidth / 2, gameMap.pxboxWidth, *entityInfo)
+            pxuiRightLoc[1] += gameMap.pxboxWidth
+
+
+def _drawEntityInfo(display: pygame.Surface):
+    global entityButtons
+    global uiFont
+    if pointedEntity is None: return
+
+    #TODO: finish and plan entity buttons
 
 
 # IMPORTANT: the first tuple argument is the portion of the space taken, must be a float between 0 and 1
-def _renderTxtBox(display: pygame.Surface, px_x, px_y, width, height, *txtPartitions: tuple[float, str, tuple[int, int, int] | str]):
-    if not txtPartitions:
-        return
-    pygame.draw.line(display, "white", (px_x, px_y), (px_x + width, px_y))
-    pygame.draw.line(display, "white", (px_x, px_y), (px_x, px_y + height))
-    pygame.draw.line(display, "white", (px_x + width, px_y), (px_x + width, px_y + height))
-    pygame.draw.line(display, "white", (px_x, px_y + height), (px_x + width, px_y + height))
+def _renderTxtBox(display: pygame.Surface, px_x, px_y, width, height, *txtPartitions: tuple[float, str, tuple[int, int, int] | str], visibleBox: bool = True):
+    global uiFont
+
+    if visibleBox:
+        pygame.draw.line(display, "white", (px_x, px_y), (px_x + width, px_y))
+        pygame.draw.line(display, "white", (px_x, px_y), (px_x, px_y + height))
+        pygame.draw.line(display, "white", (px_x + width, px_y), (px_x + width, px_y + height))
+        pygame.draw.line(display, "white", (px_x, px_y + height), (px_x + width, px_y + height))
+
+    inboxOriginX = px_x
     for portion, txt, color in txtPartitions:
-        pass
-        #TODO: if portion does not match with 0 to 1 float model, take the rest of the space and break
+        vertBarX = px_x + (width * portion)
+        pygame.draw.line(display, "white", (vertBarX, px_y), (vertBarX, px_y + height))
+        charSize = uiFont.size(txt)
+        xoffset = vertBarX - charSize[0] - inboxOriginX
+        display.blit(uiFont.render(txt, True, color), (vertBarX - charSize[0] - (xoffset / 2), px_y + height - charSize[1] - ((height - charSize[1]) / 2)))
+
+        inboxOriginX = vertBarX
 
 
 # TODO: this close call includes: socket kill call, kafka end of service call

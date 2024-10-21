@@ -7,8 +7,8 @@ import pygame
 
 class LogType(Enum):
     STANDBY = 0
-    WAITING = 1,
-    BUSY = 2,
+    WAITING = 1
+    BUSY = 2
     INCONVENIENCE = 3
 
 
@@ -84,18 +84,18 @@ class Taxi(Entity) :
 
 
     def finishService(self, newDst: Position = None) -> bool:
-        if self.currentClient is None :
-            return False
-
-        self.currentClient.pos = self.pos
-        self.currentClient.dst = None
-        self.currentClient.logType = LogType.STANDBY.value if self.pos == self.dst else LogType.INCONVENIENCE.value
-        self.currentClient.currentTaxi = None
-        self.currentClient = None
-        if newDst is not None :
-            self.dst = newDst # logType keeps busy
-        else :
+        self.dst = newDst
+        if newDst is None:
             self.logType = LogType.STANDBY.value
+
+        if self.currentClient is not None:
+            self.currentClient.pos = self.pos
+            self.currentClient.dst = None
+            self.currentClient.logType = LogType.STANDBY.value if self.pos == self.dst else LogType.INCONVENIENCE.value
+            self.currentClient.currentTaxi = None
+            self.currentClient = None
+            return True
+        return False
 
 
 
@@ -124,6 +124,7 @@ class Client(Entity) :
         self.logType = LogType.STANDBY.value
         self.pos = origin
         self.dst = destination
+        self.currentTaxi = None
 
     def __del__(self):
         self.OrphanClients.append(self.id)

@@ -84,7 +84,8 @@ class GameMap :
     def removeEntity(*entities: Entity):
         for e in entities:
             del self.entities[e.id]
-            del self.locatedEntities[e.pos]
+            positionedEntities = self.locatedEntities[e.pos]
+            del positionedEntities[positionedEntities.index(e)]
 
 
     def render(self):
@@ -145,7 +146,7 @@ class GameMap :
 
         if backgroundColor is not None: # The render is a block
             blockOffset = 0.03
-            pxPos = (pxPos[0] + (self.pxboxWidth * blockOffset), pxPos[1] + (self.pxboxWidth * blockOffset)) # TODO: Regulate this
+            pxPos = (pxPos[0] + (self.pxboxWidth * blockOffset), pxPos[1] + (self.pxboxWidth * blockOffset))
             txtToRender = pygame.Surface((self.pxboxWidth, self.pxboxWidth))
             txtToRender.fill(backgroundColor)
             txtToRender.blit(self.font.render(txt, True, color), (xoffset, yoffset))
