@@ -21,23 +21,9 @@ entityControls: list[tuple[pygame.Rect, Callable]] = []
 
 def start(socket_app: Callable):
     global gameMap
-    global isRunning
-    global pointedEntity
     global uiFont
 
-    pygame.init()
-    pygame.font.init()
-
-    display = pygame.display.set_mode((800,600), pygame.RESIZABLE)
-    gameMap = GameMap(display, MAP_WIDTH)
-    uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
-
-    gameMap.render()
-    _drawui(display)
-    pygame.display.flip()
-
-    client_application = threading.Thread(target=socket_app)
-    client_application.start()
+    display = _initObjects(socket_app)
 
     while True:
         event = pygame.event.wait()
@@ -49,6 +35,7 @@ def start(socket_app: Callable):
             gameMap.relocateEntity(event.taxi, event.oldPos)
         elif event.type == pygame.VIDEORESIZE:
             gameMap.resizeDisplay()
+            uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
         elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             _closeApplication()
 
@@ -56,6 +43,34 @@ def start(socket_app: Callable):
         gameMap.render()
         _drawui(display)
         _drawEntityPointer(display)
+        _drawEntityInfo(display)
+        pygame.display.flip()
+
+
+def start_passive(socket_app: Callable, e: Entity):
+    global gameMap
+    global uiFont
+    global pointedEntity
+
+    display = _initObjects(socket_app)
+    pointedentity = e
+
+    while True:
+        event = pygame.event.wait()
+
+        if event.type == Taxi.MoveEvent:
+            gameMap.relocateEntity(event.taxi, event.oldPos)
+        elif event.type == pygame.VIDEORESIZE:
+            gameMap.resizeDisplay()
+            uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
+        elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+            _closeApplication()
+
+        gameMap.display.fill("black")
+        gameMap.render()
+        _drawui(display)
+        _drawEntityPointer(display)
+        _drawEntityInfo(display)
         pygame.display.flip()
 
 
@@ -78,21 +93,33 @@ def randEntities(n: int) -> list[Entity]:
 #########################################
 
 
+def _initObjects(socket_app: Callable) -> pygame.Surface:
+    global gameMap
+    global uiFont
+
+    pygame.init()
+    pygame.font.init()
+
+    display = pygame.display.set_mode((800,600), pygame.RESIZABLE)
+    gameMap = GameMap(display, MAP_WIDTH)
+    uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
+
+    gameMap.render()
+    _drawui(display)
+    pygame.display.flip()
+
+    client_application = threading.Thread(target=socket_app)
+    client_application.start()
+    return display
+
+
 def _processClick(x, y):
     global pointedEntity
     global entityControls
     BUTTON = 0; FUNC = 1
     loc = gameMap.getBoxLoc(x, y)
 
-    if loc is None: # Inside the map, no buttons
-        for control in entityControls:
-            if control[BUTTON].collidePoint(x, y):
-                control[FUNC]() # Do something with pointedEntity
-                return
-        ponitedEntity = None
-        return
-
-    if (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
+    if loc is not None and (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
         isTaxi = False
         for e in l:
             if isinstance(e, Taxi):
@@ -102,39 +129,47 @@ def _processClick(x, y):
 
         if not isTaxi:
             pointedEntity = l[0]
+    else:
+        for control in entityControls:
+            if control[BUTTON].collidePoint(x, y):
+                control[FUNC]() # Do something with pointedEntity
+                return
+        pointedEntity = None
 
 
 def _drawEntityPointer(display: pygame.Surface):
-    if pointedEntity is None:
+    global pointedEntity
+    if pointedEntity is None or pointedEntity.pos is None:
         return
+    lightBlue = (0, 188, 227)
+    _drawPointer(display, *gameMap.pxgetPos(*pointedEntity.pos.toTuple()), lightBlue)
 
-    pxbaseLoc = gameMap.pxgetPos(*pointedEntity.pos.toTuple())
-    pxbaseLoc = [pxbaseLoc[0], pxbaseLoc[1]] # To support item assignment
+
+def _drawPointer(display: pygame.Surface, px_x: int | float, px_y: int | float, color):
     cursorOffset = gameMap.pxboxWidth * 0.2
-    pxbaseLoc[0] -= cursorOffset
-    pxbaseLoc[1] -= cursorOffset
+    px_x -= cursorOffset
+    px_y -= cursorOffset
     pxLength = gameMap.pxboxWidth * 0.5
     pxWidth = gameMap.pxboxWidth * 0.15
-    lightBlue = (0, 188, 227)
 
-    pygame.draw.rect(display, lightBlue, pygame.Rect(pxbaseLoc, (pxLength, pxWidth)))
-    pygame.draw.rect(display, lightBlue, pygame.Rect(pxbaseLoc, (pxWidth, pxLength)))
+    pygame.draw.rect(display, color, pygame.Rect(px_x, px_y, pxWidth, pxLength))
+    pygame.draw.rect(display, color, pygame.Rect(px_x, px_y, pxLength, pxWidth))
 
     cursorOffset *= 2.1
-    pygame.draw.rect(display, lightBlue, pygame.Rect(
-        pxbaseLoc[0], pxbaseLoc[1] + gameMap.pxboxWidth + cursorOffset - pxLength, pxWidth, pxLength))
-    pygame.draw.rect(display, lightBlue, pygame.Rect(
-        pxbaseLoc[0], pxbaseLoc[1] + gameMap.pxboxWidth + cursorOffset - pxWidth, pxLength, pxWidth))
+    pygame.draw.rect(display, color, pygame.Rect(
+        px_x, px_y + gameMap.pxboxWidth + cursorOffset - pxLength, pxWidth, pxLength))
+    pygame.draw.rect(display, color, pygame.Rect(
+        px_x, px_y + gameMap.pxboxWidth + cursorOffset - pxWidth, pxLength, pxWidth))
 
-    pygame.draw.rect(display, lightBlue, pygame.Rect(
-        pxbaseLoc[0] + gameMap.pxboxWidth + cursorOffset - pxLength, pxbaseLoc[1], pxLength, pxWidth))
-    pygame.draw.rect(display, lightBlue, pygame.Rect(
-        pxbaseLoc[0] + gameMap.pxboxWidth + cursorOffset - pxWidth, pxbaseLoc[1], pxWidth, pxLength))
+    pygame.draw.rect(display, color, pygame.Rect(
+        px_x + gameMap.pxboxWidth + cursorOffset - pxLength, px_y, pxLength, pxWidth))
+    pygame.draw.rect(display, color, pygame.Rect(
+        px_x + gameMap.pxboxWidth + cursorOffset - pxWidth, px_y, pxWidth, pxLength))
 
-    pygame.draw.rect(display, lightBlue, pygame.Rect(
-        pxbaseLoc[0] + gameMap.pxboxWidth + cursorOffset - pxWidth, pxbaseLoc[1] + gameMap.pxboxWidth + cursorOffset - pxLength, pxWidth, pxLength))
-    pygame.draw.rect(display, lightBlue, pygame.Rect(
-        pxbaseLoc[0] + gameMap.pxboxWidth + cursorOffset - pxLength, pxbaseLoc[1] + gameMap.pxboxWidth + cursorOffset - pxWidth, pxLength, pxWidth))
+    pygame.draw.rect(display, color, pygame.Rect(
+        px_x + gameMap.pxboxWidth + cursorOffset - pxWidth, px_y + gameMap.pxboxWidth + cursorOffset - pxLength, pxWidth, pxLength))
+    pygame.draw.rect(display, color, pygame.Rect(
+        px_x + gameMap.pxboxWidth + cursorOffset - pxLength, px_y + gameMap.pxboxWidth + cursorOffset - pxWidth, pxLength, pxWidth))
 
 
 def _drawui(display: pygame.Surface):
@@ -172,7 +207,7 @@ def _drawui(display: pygame.Surface):
                     curDst = chr(e.currentClient.id)
                 curLogHead += " Servicio " + curDst
             elif e.logType in [LogType.WAITING.value, LogType.BUSY.value]:
-                curLogHead += " servir base"
+                curLogHead += " central"
                 curDst = f"({e.dst.x},{e.dst.y})"
             else:
                 curLogHead += " Parado"
@@ -192,11 +227,35 @@ def _drawui(display: pygame.Surface):
 
 def _drawEntityInfo(display: pygame.Surface):
     global entityControls
+    global gameMap
     global uiFont
     if pointedEntity is None: return
 
-    widgetLoc = (((display.get_width() / 3) * 2) + (display.get_width() * 0.01), display.get_height() * 0.02)
-    widgetWidth = (display.get_width() / 3 - (display.get_width() * 0.02)
+    px_x = ((display.get_width() / 3) * 2) + (display.get_width() * 0.04)
+    px_y = (display.get_height() / 2) - (gameMap.pxboxWidth * ((len(pointedEntity.__dict__) // 2) +2))
+    widgetWidth = (display.get_width() / 3) - (display.get_width() * 0.08)
+    widgetHeight = gameMap.pxboxWidth * (len(pointedEntity.__dict__) +4)
+    borderRadius = display.get_height() * 0.03
+
+    pygame.draw.rect(display, "white", pygame.Rect(px_x, px_y, widgetWidth, widgetHeight), width=2, border_radius=int(borderRadius))
+    obj_properties = [
+        type(pointedEntity).__name__, 
+        "Id: " + (str(pointedEntity.id) if type(pointedEntity) == Taxi else chr(pointedEntity.id)),
+        "Current state: " + ["STANDBY", "WAITING", "BUSY", "INCONVENIENCE"][pointedEntity.logType], 
+        "Position: " + (str(pointedEntity.pos.toTuple()) if pointedEntity.pos is not None else "not located"),
+        "Destination: " + (str(pointedEntity.dst.toTuple()) if pointedEntity.dst is not None else "none")
+    ]
+
+    #TODO: dinamically add properties
+
+    aux_x = px_x + (widgetWidth * 0.06)
+    _renderTxtBox(display, px_x, px_y, widgetWidth, gameMap.pxboxWidth, (1, type(pointedEntity).__name__, "white"), visibleBox = False)
+
+    aux_y = px_y
+    for p in obj_properties:
+       aux_y += gameMap.pxboxWidth
+       display.blit(uiFont.render(p, True, "white"), (aux_x, aux_y))
+
     #TODO: Finish to draw buttons and add functions (could be lambdas
 
 
@@ -213,7 +272,8 @@ def _renderTxtBox(display: pygame.Surface, px_x, px_y, width, height, *txtPartit
     inboxOriginX = px_x
     for portion, txt, color in txtPartitions:
         vertBarX = px_x + (width * portion)
-        pygame.draw.line(display, "white", (vertBarX, px_y), (vertBarX, px_y + height))
+        if visibleBox:
+            pygame.draw.line(display, "white", (vertBarX, px_y), (vertBarX, px_y + height))
         charSize = uiFont.size(txt)
         xoffset = vertBarX - charSize[0] - inboxOriginX
         display.blit(uiFont.render(txt, True, color), (vertBarX - charSize[0] - (xoffset / 2), px_y + height - charSize[1] - ((height - charSize[1]) / 2)))
@@ -221,7 +281,6 @@ def _renderTxtBox(display: pygame.Surface, px_x, px_y, width, height, *txtPartit
         inboxOriginX = vertBarX
 
 
-# TODO: this close call includes: socket kill call, kafka end of service call
 def _closeApplication():
     global isRunning
     isRunning = False

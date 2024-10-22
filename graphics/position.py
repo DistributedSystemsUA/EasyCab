@@ -21,6 +21,7 @@ class Position :
     x: int = 0
     y: int = 0
 
+    # EXTREME WARNING: don't ever use this method in the context of a Taxi (dictionary memory issues), just use Taxi.move()
     def moveTo(self, dst: Position):
         direction = [0,0]
         if dst.x > self.x :
@@ -39,6 +40,11 @@ class Position :
     def pivot(self, p: Position, direction: Move):
         self.x = p.x + direction.value[M_X]
         self.y = p.y + direction.value[M_Y]
+
+    def getPivotTo(self, dst: Position):
+        p = Position(*self.toTuple())
+        p.moveTo(dst)
+        return p
 
     def toTuple(self):
         return (self.x, self.y)

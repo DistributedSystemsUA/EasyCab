@@ -49,8 +49,8 @@ class Taxi(Entity) :
         if self.logType == LogType.INCONVENIENCE.value:
             self.logType == LogType.BUSY.value
 
-        oldPosition = Position(self.pos.x, self.pos.y)
-        self.pos.moveTo(self.dst)
+        oldPosition = self.pos # old position will remain immutable because of memory security
+        self.pos = self.pos.getPivotTo(self.dst)
         if self.pos == self.dst :
             if self.currentClient is not None:
                 if self.logType == LogType.BUSY.value :
