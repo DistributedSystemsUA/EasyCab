@@ -16,7 +16,7 @@ isRunning: bool = True
 pointedEntity: Entity = None
 gameMap: GameMap = None
 uiFont: pygame.font.Font = None
-entityButtons: list[pygame.Rect] = []
+entityControls: list[tuple[pygame.Rect, Callable]] = []
 
 
 def start(socket_app: Callable):
@@ -80,9 +80,19 @@ def randEntities(n: int) -> list[Entity]:
 
 def _processClick(x, y):
     global pointedEntity
+    global entityControls
+    BUTTON = 0; FUNC = 1
     loc = gameMap.getBoxLoc(x, y)
 
-    if loc is not None and (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
+    if loc is None: # Inside the map, no buttons
+        for control in entityControls:
+            if control[BUTTON].collidePoint(x, y):
+                control[FUNC]() # Do something with pointedEntity
+                return
+        ponitedEntity = None
+        return
+
+    if (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
         isTaxi = False
         for e in l:
             if isinstance(e, Taxi):
@@ -92,9 +102,6 @@ def _processClick(x, y):
 
         if not isTaxi:
             pointedEntity = l[0]
-    else:
-        pointedEntity = None
-        # TODO: manage if mouse pointed to the ui (at right, where the buttons will be)
 
 
 def _drawEntityPointer(display: pygame.Surface):
@@ -184,11 +191,13 @@ def _drawui(display: pygame.Surface):
 
 
 def _drawEntityInfo(display: pygame.Surface):
-    global entityButtons
+    global entityControls
     global uiFont
     if pointedEntity is None: return
 
-    #TODO: finish and plan entity buttons
+    widgetLoc = (((display.get_width() / 3) * 2) + (display.get_width() * 0.01), display.get_height() * 0.02)
+    widgetWidth = (display.get_width() / 3 - (display.get_width() * 0.02)
+    #TODO: Finish to draw buttons and add functions (could be lambdas
 
 
 # IMPORTANT: the first tuple argument is the portion of the space taken, must be a float between 0 and 1
