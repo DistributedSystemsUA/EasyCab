@@ -1,8 +1,13 @@
 from kafka import KafkaConsumer
 
+ip = input("Dame la ip que va a usar kafka: ")
+ip += ":9092"
+
+print(ip)
+
 consumer = KafkaConsumer(
     'test',
-    bootstrap_servers='192.168.18.54:29092',
+    bootstrap_servers= ip,
     auto_offset_reset='earliest',
     enable_auto_commit=True,
     group_id='my-group'
