@@ -1,4 +1,6 @@
-#!/home/manuel/Documentos/PruebasKafkaPython/myenv/bin/python3.8
+#!/bin/sh
+'''exec' "/media/manuel/Nuevo vol/PruebasKafkaPython/myenv/bin/python3" "$0" "$@"
+' '''
 # -*- coding: utf-8 -*-
 import re
 import sys
