@@ -86,7 +86,7 @@ class Taxi(Entity):
         return True
 
 
-    def isBusy() -> bool:
+    def isBusy(self) -> bool:
         return self.dst is not None
 
 
@@ -98,7 +98,7 @@ class Taxi(Entity):
     def startService(self):
         self.lock.acquire()
         self.logType = LogType.BUSY.value
-        self.currentClient.logType = Logtype.BUSY.value
+        self.currentClient.logType = LogType.BUSY.value
         self.dst = self.currentClient.dst
         self.lock.release()
         pygame.event.post(pygame.event.Event(Taxi.UnlocateClient, {"client" : self.currentClient}))
@@ -117,9 +117,13 @@ class Taxi(Entity):
             self.currentClient.dst = None
             self.currentClient.logType = LogType.STANDBY.value if self.currentClient.pos == self.currentClient.dst else LogType.WAITING.value
             self.currentClient.currentTaxi = None
+            self.lock.release()
+
+            pygame.event.post(pygame.event.Event(Taxi.LocateClient, {"client" : self.currentClient}))
+
+            self.lock.acquire()
             self.currentClient = None
             self.lock.release()
-            pygame.event.post(pygame.event.Event(Taxi.LocateClient, {"client", self.currentClient}))
 
 
 @dataclass(init = False)
@@ -152,4 +156,8 @@ class Client(Entity) :
     def __del__(self):
         self.OrphanClients.append(self.id)
         self.OrphanDestinations.append(self.dstId)
+
+
+    def hasTaxi(self) -> bool:
+        return self.currentTaxi is not None
 

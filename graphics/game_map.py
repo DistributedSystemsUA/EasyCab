@@ -72,7 +72,7 @@ class GameMap :
 
 
     def unlocateEntity(self, e: Entity) -> bool:
-        if e.pos is None or e.locatedEntities.get(e.pos) is None or e not in self.locatedEntities.get(e.pos):
+        if e.pos is None or self.locatedEntities.get(e.pos) is None or e not in self.locatedEntities.get(e.pos):
             return False
         e_list = self.locatedEntities[e.pos]
         del e_list[e_list.index(e)]
