@@ -243,7 +243,7 @@ def _drawui(display: pygame.Surface):
             curLogHead = "OK."
             if e.currentTaxi is not None:
                 curLogHead += " Taxi " + str(e.currentTaxi.id)
-            entityInfo = ((0.2, chr(e.id), "white"), (0.5, chr(e.dstId if e.dst is not None else "-"), "white"), (1, curLogHead, "white"))
+            entityInfo = ((0.2, chr(e.id), "white"), (0.5, chr(e.dstId if e.dst is not None else ord('-')), "white"), (1, curLogHead, "white"))
             _renderTxtBox(display, *pxuiRightLoc, pxuiWidth / 2, gameMap.pxboxWidth, *entityInfo)
             pxuiRightLoc[1] += gameMap.pxboxWidth
 
