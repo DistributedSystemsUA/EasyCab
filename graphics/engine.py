@@ -28,16 +28,9 @@ def start(socket_app: Callable):
     while True:
         event = pygame.event.wait()
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == LEFT_CLICK:
-                _processClick(*pygame.mouse.get_pos())
-        elif event.type == Taxi.MoveEvent:
-            gameMap.relocateEntity(event.taxi, event.oldPos)
-        elif event.type == pygame.VIDEORESIZE:
-            gameMap.resizeDisplay()
-            uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
-        elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-            _closeApplication()
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == LEFT_CLICK:
+            _processClick(*pygame.mouse.get_pos())
+        _handlePassiveEvents(event)
 
         gameMap.display.fill("black")
         gameMap.render()
@@ -78,8 +71,16 @@ def randPos(mapSideLength: int):
     return Position(randint(1, mapSideLength), randint(1, mapSideLength))
 
 
+_nextAutoId = 1
+def _autogenId() -> int:
+    global _nextAutoId
+    newId = _nextAutoId
+    _nextAutoId += 1
+    return newId
+
+
 def randEntity() -> Entity:
-    t = Taxi(randPos(MAP_WIDTH), randPos(MAP_WIDTH)) if randint(0,1) == 0 else Client(randPos(MAP_WIDTH), randPos(MAP_WIDTH))
+    t = Taxi(_autogenId(), randPos(MAP_WIDTH), randPos(MAP_WIDTH)) if randint(0,1) == 0 else Client(randPos(MAP_WIDTH), randPos(MAP_WIDTH))
     t.logType = LogType.WAITING.value
     return t
 
@@ -91,6 +92,27 @@ def randEntities(n: int) -> list[Entity]:
 #########################################
 #          INTERNAL FUNCTIONS           #
 #########################################
+
+
+def _handlePassiveEvents(event: pygame.event.Event) -> bool:
+    global uiFont
+    global gameMap
+    activateRendering = True
+
+    if event.type == Taxi.MoveEvent:
+        gameMap.relocateEntity(event.taxi, event.oldPos)
+    elif event.type == Taxi.UnlocateClient:
+        gameMap.unlocateEntity(event.client) # No need to re-render cause call includes
+        activateRendering = False
+    elif event.type == Taxi.LocateClient:
+        gameMap.relocateEntity(event.client)
+    elif event.type == Taxi.JustRender:
+        pass
+    elif event.type == pygame.VIDEORESIZE:
+        gameMap.resizeDisplay()
+        uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
+    elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+        _closeApplication()
 
 
 def _initObjects(socket_app: Callable) -> pygame.Surface:
@@ -142,10 +164,11 @@ def _drawEntityPointer(display: pygame.Surface):
     if pointedEntity is None or pointedEntity.pos is None:
         return
     lightBlue = (0, 188, 227)
-    _drawPointer(display, *gameMap.pxgetPos(*pointedEntity.pos.toTuple()), lightBlue)
+    _drawPointer(display, *pointedEntity.pos.toTuple(), lightBlue)
 
 
-def _drawPointer(display: pygame.Surface, px_x: int | float, px_y: int | float, color):
+def _drawPointer(display: pygame.Surface, x: int | float, y: int | float, color):
+    px_x, px_y = gameMap.pxgetPos(x,y)
     cursorOffset = gameMap.pxboxWidth * 0.2
     px_x -= cursorOffset
     px_y -= cursorOffset
@@ -239,7 +262,6 @@ def _drawEntityInfo(display: pygame.Surface):
 
     pygame.draw.rect(display, "white", pygame.Rect(px_x, px_y, widgetWidth, widgetHeight), width=2, border_radius=int(borderRadius))
     obj_properties = [
-        type(pointedEntity).__name__, 
         "Id: " + (str(pointedEntity.id) if type(pointedEntity) == Taxi else chr(pointedEntity.id)),
         "Current state: " + ["STANDBY", "WAITING", "BUSY", "INCONVENIENCE"][pointedEntity.logType], 
         "Position: " + (str(pointedEntity.pos.toTuple()) if pointedEntity.pos is not None else "not located"),

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import ClassVar
 from position import *
 import pygame
+import threading
 
 
 class LogType(Enum):
@@ -21,27 +22,24 @@ class Entity :
 
 
 @dataclass(init = False)
-class Taxi(Entity) :
-    NextTaxiId: ClassVar[int] = 1
-    OrphanTaxis: ClassVar[list[int]] = []
+class Taxi(Entity):
     MoveEvent: ClassVar[int] = pygame.event.custom_type()
+    UnlocateClient: ClassVar[int] = pygame.event.custom_type()
+    LocateClient: ClassVar[int] = pygame.event.custom_type()
+    JustRender: ClassVar[int] = pygame.event.custom_type()
 
     currentClient: Client = None
+    lock = threading.Lock()
 
-    def __init__(self, origin: Position, dst: Position = None):
-        if not Taxi.OrphanTaxis :
-            self.id = Taxi.NextTaxiId
-            Taxi.NextTaxiId += 1
-        else :
-            self.id = Taxi.OrphanTaxis.pop(0)
-
+    def __init__(self, own_id: int, origin: Position, dst: Position = None):
+        self.id = own_id
         self.logType = LogType.STANDBY.value
         self.pos = origin
         self.dst = dst
 
 
-    def __del__(self):
-        Taxi.OrphanTaxis.append(self.id)
+    def __eq__(self, other):
+        return isinstance(other, Taxi) and self.id == other.id and self.pos == other.pos and self.logType == other.logType and self.dst == other.dst
 
 
     def move(self):
@@ -49,16 +47,17 @@ class Taxi(Entity) :
         if self.logType == LogType.INCONVENIENCE.value:
             self.logType == LogType.BUSY.value
 
-        oldPosition = self.pos # old position will remain immutable because of memory security
+        self.lock.acquire()
+        oldPosition = self.pos # old pos immutable = mem security
         self.pos = self.pos.getPivotTo(self.dst)
+        self.lock.release()
+
         if self.pos == self.dst :
             if self.currentClient is not None:
                 if self.logType == LogType.BUSY.value :
                     self.finishService()
-                else : # WAITING so start service
-                    self.logType = LogType.BUSY.value
-                    self.currentClient.logType = Logtype.BUSY.value
-                    self.dst = self.currentClient.dst
+                else :
+                    self.startService()
             else :
                 self.dst = None
                 self.logType = LogType.STANDBY.value
@@ -66,37 +65,61 @@ class Taxi(Entity) :
 
 
     def stop(self):
+        self.lock.acquire()
         self.logType = LogType.INCONVENIENCE.value
+        pygame.event.post(pygame.event.Event(Taxi.JustRender))
+        self.lock.release()
 
 
-    def aquireClient(self, c: Client) -> bool:
+    def assignClient(self, c: Client) -> bool:
         if c is None or c.dst is None or self.currentClient is not None:
             return False
 
-        c.currentTaxi = self
-        c.pos = None # No render position while in Taxi
-        c.logType = LogType.WAITING.value
+        self.lock.acquire()
         self.currentClient = c
         self.logType = LogType.WAITING.value
         self.dst = c.pos
+        c.currentTaxi = self
+        c.logType = LogType.WAITING.value
+        self.lock.release()
         
         return True
 
 
-    def finishService(self, newDst: Position = None) -> bool:
-        self.dst = newDst
-        if newDst is None:
+    def isBusy() -> bool:
+        return self.dst is not None
+
+
+    #############################
+    #     Internal functions    #
+    #############################
+
+
+    def startService(self):
+        self.lock.acquire()
+        self.logType = LogType.BUSY.value
+        self.currentClient.logType = Logtype.BUSY.value
+        self.dst = self.currentClient.dst
+        self.lock.release()
+        pygame.event.post(pygame.event.Event(Taxi.UnlocateClient, {"client" : self.currentClient}))
+
+
+    def finishService(self, newDst: Position = None):
+        if newDst is not None:
+            self.dst = newDst
+            self.logType = LogType.WAITING.value
+        else:
             self.logType = LogType.STANDBY.value
 
         if self.currentClient is not None:
-            self.currentClient.pos = self.pos
+            self.lock.acquire()
+            self.currentClient.pos = Position(*self.pos.toTuple())
             self.currentClient.dst = None
-            self.currentClient.logType = LogType.STANDBY.value if self.pos == self.dst else LogType.INCONVENIENCE.value
+            self.currentClient.logType = LogType.STANDBY.value if self.currentClient.pos == self.currentClient.dst else LogType.WAITING.value
             self.currentClient.currentTaxi = None
             self.currentClient = None
-            return True
-        return False
-
+            self.lock.release()
+            pygame.event.post(pygame.event.Event(Taxi.LocateClient, {"client", self.currentClient}))
 
 
 @dataclass(init = False)
