@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import ClassVar
+from typing import ClassVar, NamedTuple
 from position import *
 import pygame
 import threading
@@ -11,6 +11,11 @@ class LogType(Enum):
     WAITING = 1
     BUSY = 2
     INCONVENIENCE = 3
+
+
+class Location(NamedTuple):
+    ID: int
+    pos: Position
 
 
 @dataclass
@@ -129,9 +134,7 @@ class Taxi(Entity):
 @dataclass(init = False)
 class Client(Entity) :
     NextClientId: ClassVar[int] = ord('a')
-    NextDestinationId: ClassVar[int] = ord('A')
     OrphanClients: ClassVar[list[int]] = []
-    OrphanDestinations: ClassVar[list[int]] = []
 
     dstId: int = 0
 
@@ -142,20 +145,18 @@ class Client(Entity) :
         else :
             self.id = Client.OrphanClients.pop(0)
 
-        if not Client.OrphanDestinations :
-            self.dstId = Client.NextDestinationId
-            Client.NextDestinationId += 1
-        else :
-            self.dstId = Client.OrphanDestinations.pop(0)
-
         self.logType = LogType.STANDBY.value
         self.pos = origin
-        self.dst = destination
         self.currentTaxi = None
+        self.dst = destination
 
     def __del__(self):
-        self.OrphanClients.append(self.id)
-        self.OrphanDestinations.append(self.dstId)
+        Client.OrphanClients.append(self.id)
+
+
+    def setDstLocation(loc: Location):
+        self.dst = Position(*loc.pos.toTuple()) # TODO: make the location system null
+        self.dstId = loc.ID
 
 
     def hasTaxi(self) -> bool:

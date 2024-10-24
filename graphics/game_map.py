@@ -12,6 +12,7 @@ class GameMap :
 
         self.entities = {}
         self.locatedEntities = {}
+        self.locations = {}
         self.addEntities(*entities)
         self.display = display
         self.resizeDisplay()
@@ -25,7 +26,7 @@ class GameMap :
             (self.display.get_width() / 3) + 10, 
             (self.display.get_height() / 2) - (self.pxWidth / 2))
 
-        self.font = pygame.font.Font(pygame.font.get_default_font(), size=int(self.pxboxWidth * 0.7))
+        self.font = pygame.font.Font(pygame.font.get_default_font(), size=int(self.pxboxWidth * 0.6))
 
 
     def isInside(self, p: Position):
@@ -55,6 +56,12 @@ class GameMap :
                     self.locatedEntities[e.pos].append(e)
             else :
                 print(f'The entity {e} is not inside the map')
+
+
+    def addLocations(self, *locations: Location):
+        for l in locations:
+            if self.isInside(l.pos):
+                self.locations[l.ID] = l
 
 
     def relocateEntity(self, e: Entity, oldPos: Position = None) -> bool:
@@ -121,6 +128,9 @@ class GameMap :
                 continue
             self.renderEntity(e)
 
+        for l in self.locations.values():
+            renderLocation(l)
+
         for e in renderPriorities:
             self.renderEntity(e)
 
@@ -133,17 +143,20 @@ class GameMap :
         entityTxt = f'{e.id}'
         if isinstance(e, Taxi):
             entityColor = ["red", "green", "green", "red"][e.logType]
+            if e.logType == LogType.INCONVENIENCE.value: entityTxt += "!"
+
             if e.currentClient is not None and e.currentClient.logType == LogType.BUSY.value:
                 entityTxt += f'{chr(e.currentClient.id)}'
-                self.renderInboxText(f'{chr(e.currentClient.dstId)}', self.pxgetPos(*e.currentClient.dst.toTuple()), "black", "blue")
-
-            if e.logType == LogType.INCONVENIENCE.value: entityTxt += "!"
         else:
             entityTxt = f'{chr(e.id)}'
-            if e.dst is not None:
-                self.renderInboxText(f'{chr(e.dstId)}', self.pxgetPos(*e.dst.toTuple()), "black", "blue")
 
         self.renderInboxText(entityTxt, self.pxgetPos(*e.pos.toTuple()), "black", entityColor)
+
+
+    def renderLocation(l: int | Location):
+        if isinstance(l, int):
+            l = self.locations[l.ID]
+        self.renderInboxText(f'{chr(l.ID)}', self.pxgetPos(*e.currentClient.dst.toTuple()), "black", "blue")
 
 
     def pxgetPos(self, x: int | float, y: int | float) -> tuple:
