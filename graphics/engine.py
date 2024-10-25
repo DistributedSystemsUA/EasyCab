@@ -28,16 +28,12 @@ def start(socket_app: Callable):
     while True:
         event = pygame.event.wait()
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == LEFT_CLICK:
-                _processClick(*pygame.mouse.get_pos())
-        elif event.type == Taxi.MoveEvent:
-            gameMap.relocateEntity(event.taxi, event.oldPos)
-        elif event.type == pygame.VIDEORESIZE:
-            gameMap.resizeDisplay()
-            uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
-        elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-            _closeApplication()
+        my_location = Location(65, Position(3, 4))
+        gameMap.addLocations(my_location)
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == LEFT_CLICK:
+            _processClick(*pygame.mouse.get_pos())
+        _handlePassiveEvents(event)
 
         gameMap.display.fill("black")
         gameMap.render()
@@ -78,8 +74,16 @@ def randPos(mapSideLength: int):
     return Position(randint(1, mapSideLength), randint(1, mapSideLength))
 
 
+_nextAutoId = 1
+def _autogenId() -> int:
+    global _nextAutoId
+    newId = _nextAutoId
+    _nextAutoId += 1
+    return newId
+
+
 def randEntity() -> Entity:
-    t = Taxi(randPos(MAP_WIDTH), randPos(MAP_WIDTH)) if randint(0,1) == 0 else Client(randPos(MAP_WIDTH), randPos(MAP_WIDTH))
+    t = Taxi(_autogenId(), randPos(MAP_WIDTH), randPos(MAP_WIDTH)) if randint(0,1) == 0 else Client(randPos(MAP_WIDTH), randPos(MAP_WIDTH))
     t.logType = LogType.WAITING.value
     return t
 
@@ -91,6 +95,27 @@ def randEntities(n: int) -> list[Entity]:
 #########################################
 #          INTERNAL FUNCTIONS           #
 #########################################
+
+
+def _handlePassiveEvents(event: pygame.event.Event) -> bool:
+    global uiFont
+    global gameMap
+    activateRendering = True
+
+    if event.type == Taxi.MoveEvent:
+        gameMap.relocateEntity(event.taxi, event.oldPos)
+    elif event.type == Taxi.UnlocateClient:
+        gameMap.unlocateEntity(event.client) # No need to re-render cause call includes
+        activateRendering = False
+    elif event.type == Taxi.LocateClient:
+        gameMap.relocateEntity(event.client)
+    elif event.type == Taxi.JustRender:
+        pass
+    elif event.type == pygame.VIDEORESIZE:
+        gameMap.resizeDisplay()
+        uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
+    elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
+        _closeApplication()
 
 
 def _initObjects(socket_app: Callable) -> pygame.Surface:
@@ -142,10 +167,11 @@ def _drawEntityPointer(display: pygame.Surface):
     if pointedEntity is None or pointedEntity.pos is None:
         return
     lightBlue = (0, 188, 227)
-    _drawPointer(display, *gameMap.pxgetPos(*pointedEntity.pos.toTuple()), lightBlue)
+    _drawPointer(display, *pointedEntity.pos.toTuple(), lightBlue)
 
 
-def _drawPointer(display: pygame.Surface, px_x: int | float, px_y: int | float, color):
+def _drawPointer(display: pygame.Surface, x: int | float, y: int | float, color):
+    px_x, px_y = gameMap.pxgetPos(x,y)
     cursorOffset = gameMap.pxboxWidth * 0.2
     px_x -= cursorOffset
     px_y -= cursorOffset
@@ -202,7 +228,7 @@ def _drawui(display: pygame.Surface):
 
             if e.currentClient != None:
                 if e.currentClient.dst == e.dst:
-                    curDst = chr(e.currentClient.dstId)
+                    curDst = chr(e.currentClient.dstId) if e.currentClient.dstId > 0 else "?"
                 else:
                     curDst = chr(e.currentClient.id)
                 curLogHead += " Servicio " + curDst
@@ -220,7 +246,13 @@ def _drawui(display: pygame.Surface):
             curLogHead = "OK."
             if e.currentTaxi is not None:
                 curLogHead += " Taxi " + str(e.currentTaxi.id)
-            entityInfo = ((0.2, chr(e.id), "white"), (0.5, chr(e.dstId if e.dst is not None else "-"), "white"), (1, curLogHead, "white"))
+            if e.dst is None:
+                clientDst = '-'
+            elif e.dstId > 0:
+                clientDst = chr(e.dstId)
+            else:
+                clientDst = f"({e.dst.x},{e.dst.y})"
+            entityInfo = ((0.2, chr(e.id), "white"), (0.5, clientDst, "white"), (1, curLogHead, "white"))
             _renderTxtBox(display, *pxuiRightLoc, pxuiWidth / 2, gameMap.pxboxWidth, *entityInfo)
             pxuiRightLoc[1] += gameMap.pxboxWidth
 
@@ -234,12 +266,12 @@ def _drawEntityInfo(display: pygame.Surface):
     px_x = ((display.get_width() / 3) * 2) + (display.get_width() * 0.04)
     px_y = (display.get_height() / 2) - (gameMap.pxboxWidth * ((len(pointedEntity.__dict__) // 2) +2))
     widgetWidth = (display.get_width() / 3) - (display.get_width() * 0.08)
-    widgetHeight = gameMap.pxboxWidth * (len(pointedEntity.__dict__) +4)
+
+    widgetHeight = gameMap.pxboxWidth * (len(pointedEntity.__dict__) +1) #TODO: look in representation about dictionary lengths
     borderRadius = display.get_height() * 0.03
 
     pygame.draw.rect(display, "white", pygame.Rect(px_x, px_y, widgetWidth, widgetHeight), width=2, border_radius=int(borderRadius))
     obj_properties = [
-        type(pointedEntity).__name__, 
         "Id: " + (str(pointedEntity.id) if type(pointedEntity) == Taxi else chr(pointedEntity.id)),
         "Current state: " + ["STANDBY", "WAITING", "BUSY", "INCONVENIENCE"][pointedEntity.logType], 
         "Position: " + (str(pointedEntity.pos.toTuple()) if pointedEntity.pos is not None else "not located"),

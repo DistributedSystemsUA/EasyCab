@@ -12,6 +12,7 @@ class GameMap :
 
         self.entities = {}
         self.locatedEntities = {}
+        self.locations = {}
         self.addEntities(*entities)
         self.display = display
         self.resizeDisplay()
@@ -25,7 +26,7 @@ class GameMap :
             (self.display.get_width() / 3) + 10, 
             (self.display.get_height() / 2) - (self.pxWidth / 2))
 
-        self.font = pygame.font.Font(pygame.font.get_default_font(), size=int(self.pxboxWidth * 0.7))
+        self.font = pygame.font.Font(pygame.font.get_default_font(), size=int(self.pxboxWidth * 0.6))
 
 
     def isInside(self, p: Position):
@@ -46,6 +47,8 @@ class GameMap :
 
         for e in entities :
             if self.isInside(e.pos) :
+                if self.entities.get(e.id) is not None:
+                    raise ValueError(f'Identification collision, duplicated id: {str(e)}')
                 self.entities[e.id] = e
                 if self.locatedEntities.get(e.pos) is None:
                     self.locatedEntities[e.pos] = [e]
@@ -55,17 +58,33 @@ class GameMap :
                 print(f'The entity {e} is not inside the map')
 
 
+    def addLocations(self, *locations: Location):
+        for l in locations:
+            if self.isInside(l.pos):
+                self.locations[l.ID] = l
+
+
     def relocateEntity(self, e: Entity, oldPos: Position = None) -> bool:
-        if self.isInside(e.pos):
-            if self.locatedEntities.get(e.pos) is None:
-                self.locatedEntities[e.pos] = [e]
-            else:
-                self.locatedEntities[e.pos].append(e)
+        if not self.isInside(e.pos):
+            return False
 
-            if oldPos is not None and (e_list := self.locatedEntities.get(oldPos)) is not None and e in e_list:
-                del e_list[e_list.index(e)]
+        if self.locatedEntities.get(e.pos) is None:
+            self.locatedEntities[e.pos] = [e]
+        else:
+            self.locatedEntities[e.pos].append(e)
 
-        return False
+        if oldPos is not None and (e_list := self.locatedEntities.get(oldPos)) is not None and e in e_list:
+            del e_list[e_list.index(e)]
+        return True
+
+
+    def unlocateEntity(self, e: Entity) -> bool:
+        if e.pos is None or self.locatedEntities.get(e.pos) is None or e not in self.locatedEntities.get(e.pos):
+            return False
+        e_list = self.locatedEntities[e.pos]
+        del e_list[e_list.index(e)]
+        e.pos = None
+        return True
 
 
     def getEntity(self, eId: int) -> Entity:
@@ -109,6 +128,9 @@ class GameMap :
                 continue
             self.renderEntity(e)
 
+        for l in self.locations.values():
+            self.renderLocation(l)
+
         for e in renderPriorities:
             self.renderEntity(e)
 
@@ -121,16 +143,20 @@ class GameMap :
         entityTxt = f'{e.id}'
         if isinstance(e, Taxi):
             entityColor = ["red", "green", "green", "red"][e.logType]
-            if e.currentClient is not None:
+            if e.logType == LogType.INCONVENIENCE.value: entityTxt += "!"
+
+            if e.currentClient is not None and e.currentClient.logType == LogType.BUSY.value:
                 entityTxt += f'{chr(e.currentClient.id)}'
-                self.renderInboxText(f'{chr(e.currentClient.dstId)}', self.pxgetPos(*e.currentClient.dst.toTuple()), "black", "blue")
         else:
             entityTxt = f'{chr(e.id)}'
-            if e.dst is not None:
-                self.renderInboxText(f'{chr(e.dstId)}', self.pxgetPos(*e.dst.toTuple()), "black", "blue")
 
         self.renderInboxText(entityTxt, self.pxgetPos(*e.pos.toTuple()), "black", entityColor)
 
+
+    def renderLocation(self,l: int | Location):
+        if isinstance(l, int):
+            l = self.locations[l.ID]
+        self.renderInboxText(f'{chr(l.ID)}', self.pxgetPos(*l.pos.toTuple()), "black", "blue")
 
     def pxgetPos(self, x: int | float, y: int | float) -> tuple:
         return (self.pxLoc.x + (self.pxboxWidth * x), self.pxLoc.y + (self.pxboxWidth * y))
