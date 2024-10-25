@@ -105,6 +105,7 @@ def escucha_clientes():
             ids = cursor.fetchone()
             if ids[0] == datos[1]:
                 producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
+                producer.send('imprimirC',(f"{datos[1]}").encode('utf-8'))
             else:
                 producer.send(f'clientes{datos[0]}', ("KO").encode('utf-8'))
     
@@ -116,7 +117,6 @@ def escucha_Taxi():
 
 def main():
     cargarPosiciones()
-    #imprimirPosiciones(posiciones)
         
     hilo_1 = threading.Thread(target=escucha_clientes)
     hilo_1.start()

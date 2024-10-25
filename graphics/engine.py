@@ -3,6 +3,10 @@ import threading
 from random import randint
 from typing import Callable
 
+import sqlite3
+from kafka import KafkaConsumer,KafkaProducer
+import random
+
 from entities import *
 from game_map import *
 
@@ -24,12 +28,73 @@ def start(socket_app: Callable):
     global uiFont
 
     display = _initObjects(socket_app)
-
+    ###VARIABLES PARA IMPRIMIR LOCALIZACIONES
+    conn = sqlite3.connect('EasyCab.db')
+    impresas = False
+    lanzadoHiloIC = False
+    #----------------------------------------------
     while True:
         event = pygame.event.wait()
 
-        my_location = Location(65, Position(3, 4))
-        gameMap.addLocations(my_location)
+        #imprimir posiciones de la DB:
+        cursor = conn.cursor()
+        cursor.execute("SELECT ID,x,y FROM Posicion")
+        posiciones = cursor.fetchall()
+        if len(posiciones) > 0:
+            for posicion in posiciones:
+                my_location = Location(ord(posicion[0]), Position(posicion[1], posicion[2]))
+                gameMap.addLocations(my_location)
+                pass
+        cursor.close()
+        
+        #-------------------------------------------------------------------------------------------------------------
+        #Imprimir CLientes
+        def imprimirClientes():
+            connC = sqlite3.connect('EasyCab.db')
+            cursorC = connC.cursor()
+            ip = "192.168.18.54" #input("Dame la ip que va a usar kafka: ")
+            ip += ":9092"
+
+            consumer = KafkaConsumer(
+                'imprimirC',
+                bootstrap_servers= ip,
+                auto_offset_reset='earliest',
+                enable_auto_commit=True,
+                group_id='my-group'
+            )
+
+            posicionesDisponibles = [(x, y) for x in range(1, 21) for y in range(1, 21)]
+
+            cursorC.execute("SELECT x,y FROM Posicion")
+            posicionesNoD = cursorC.fetchall()
+            for p in posicionesNoD:
+                x,y = p
+                posicionesDisponibles.remove((x,y))
+            
+            for message in consumer:
+                destino = message.value.decode('utf-8')
+                cursorC.execute("SELECT x,y FROM Posicion WHERE ID = ?", (destino,))
+                id = cursorC.fetchone()
+                if len(id) == 2:
+                    x,y = id
+                    for posiciones in gameMap.locatedEntities.keys():
+                        posicion_tuple = (posiciones.x, posiciones.y)
+                        if posicion_tuple in posicionesDisponibles:
+                            posicionesDisponibles.remove(posicion_tuple)
+
+                    print(destino)
+                    posicion_aleatoria = random.choice(posicionesDisponibles)
+                    my_client = Client(Position(posicion_aleatoria[0],posicion_aleatoria[1]),Position(int(x),int(y)))
+                    gameMap.addEntities(my_client)
+                    posicionesDisponibles.remove(posicion_aleatoria)
+
+        if(lanzadoHiloIC == False):
+            lanzadoHiloIC = True
+            print("Lanzo hiloIC")
+            hiloIC = threading.Thread(target=imprimirClientes)
+            hiloIC.start()
+
+        #-------------------------------------------------------------------------------------------------------------
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == LEFT_CLICK:
             _processClick(*pygame.mouse.get_pos())
