@@ -85,11 +85,6 @@ class GameMap :
         del e_list[e_list.index(e)]
         e.pos = None
         return True
-
-
-    def getEntity(self, eId: int) -> Entity:
-        if eId in self.entities :
-            return self.entities[eId]
         else :
             return None
 
