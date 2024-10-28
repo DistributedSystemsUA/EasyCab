@@ -85,8 +85,6 @@ class GameMap :
         del e_list[e_list.index(e)]
         e.pos = None
         return True
-        else :
-            return None
 
 
     def locateEntities(self, p: Position) -> list[Entity]:
