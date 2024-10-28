@@ -122,7 +122,7 @@ class GameMap :
             self.renderEntity(e)
 
         for l in self.locations.values():
-            renderLocation(l)
+            self.renderLocation(l)
 
         for e in renderPriorities:
             self.renderEntity(e)
