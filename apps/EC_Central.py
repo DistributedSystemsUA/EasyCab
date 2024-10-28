@@ -1,3 +1,5 @@
+from path_load import *
+
 import socket
 from kafka import KafkaConsumer,KafkaProducer
 import engine
@@ -244,7 +246,7 @@ def moverTaxis():
 #-----------------------------------------------------------------------------------------------------------------
 def main():
     cargarPosiciones()
-    hilo_servidor = threading.Thread(target=servidor_central, args=(puerto,))
+    hilo_servidor = threading.Thread(target=servidor_central, args=(args.puerto_central,))
     hilo_servidor.start()
     hilo_cliente = threading.Thread(target=cargarClientes, args=(args.kafka,))
     hilo_cliente.start()
