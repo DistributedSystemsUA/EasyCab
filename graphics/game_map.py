@@ -85,11 +85,6 @@ class GameMap :
         del e_list[e_list.index(e)]
         e.pos = None
         return True
-
-
-    def getEntity(self, eId: int) -> Entity:
-        if eId in self.entities :
-            return self.entities[eId]
         else :
             return None
 
@@ -129,7 +124,7 @@ class GameMap :
             self.renderEntity(e)
 
         for l in self.locations.values():
-            self.renderLocation(l)
+            renderLocation(l)
 
         for e in renderPriorities:
             self.renderEntity(e)
@@ -153,10 +148,11 @@ class GameMap :
         self.renderInboxText(entityTxt, self.pxgetPos(*e.pos.toTuple()), "black", entityColor)
 
 
-    def renderLocation(self,l: int | Location):
+    def renderLocation(l: int | Location):
         if isinstance(l, int):
             l = self.locations[l.ID]
-        self.renderInboxText(f'{chr(l.ID)}', self.pxgetPos(*l.pos.toTuple()), "black", "blue")
+        self.renderInboxText(f'{chr(l.ID)}', self.pxgetPos(*e.currentClient.dst.toTuple()), "black", "blue")
+
 
     def pxgetPos(self, x: int | float, y: int | float) -> tuple:
         return (self.pxLoc.x + (self.pxboxWidth * x), self.pxLoc.y + (self.pxboxWidth * y))
