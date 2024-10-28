@@ -114,6 +114,37 @@ class Taxi(Entity):
             self.dst = newDst
             self.logType = LogType.WAITING.value
         else:
+            self.logType = LogType.STANDBY.value
+
+        if self.currentClient is not None:
+            self.lock.acquire()
+            self.currentClient.pos = Position(*self.pos.toTuple())
+            self.currentClient.dst = None
+            self.currentClient.logType = LogType.STANDBY.value if self.currentClient.pos == self.currentClient.dst else LogType.WAITING.value
+            self.currentClient.currentTaxi = None
+            self.lock.release()
+
+            pygame.event.post(pygame.event.Event(Taxi.LocateClient, {"client" : self.currentClient}))
+
+            self.lock.acquire()
+            self.currentClient = None
+            self.lock.release()
+
+
+@dataclass(init = False)
+class Client(Entity) :
+    NextClientId: ClassVar[int] = ord('a')
+    OrphanClients: ClassVar[list[int]] = []
+
+    dstId: int = 0
+
+    def __init__(self, origin: Position, destination: Position = None):
+        if not Client.OrphanClients :
+            self.id = Client.NextClientId
+            Client.NextClientId += 1
+        else :
+            self.id = Client.OrphanClients.pop(0)
+
         self.logType = LogType.STANDBY.value
         self.pos = origin
         self.currentTaxi = None
@@ -126,10 +157,6 @@ class Taxi(Entity):
     def setDstLocation(loc: Location):
         self.dst = Position(*loc.pos.toTuple()) # TODO: make the location system null
         self.dstId = loc.ID
-
-
-    def hasTaxi(self) -> bool:
-        return self.currentTaxi is not None
 
 
     def hasTaxi(self) -> bool:
