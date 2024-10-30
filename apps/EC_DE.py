@@ -7,7 +7,7 @@ PORT = 9991
 
 BEL = 0x07
 
-def sensor(kafka):
+def sensor(kafka,id_taxi):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((HOST, PORT))
 
@@ -25,7 +25,7 @@ def sensor(kafka):
             
             if data[0] == BEL:
                 producer = KafkaProducer(bootstrap_servers= kafka)
-                producer.send('pararTaxi', (f"{data[1]}").encode('utf-8'))
+                producer.send('pararTaxi', (f"{data[1]} {id_taxi}").encode('utf-8'))
                 producer.flush()
                 producer.close()
 
@@ -60,4 +60,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     validarTaxi(args.ip_central,args.puerto_central,args.id_taxi)
-    sensor(args.kafka)
+    sensor(args.kafka,args.id_taxi)

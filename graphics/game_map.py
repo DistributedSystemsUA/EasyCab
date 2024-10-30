@@ -93,7 +93,7 @@ class GameMap :
         return self.locatedEntities.get(p)
 
 
-    def removeEntity(*entities: Entity):
+    def removeEntity(self,*entities: Entity):
         for e in entities:
             del self.entities[e.id]
             positionedEntities = self.locatedEntities[e.pos]
@@ -146,10 +146,10 @@ class GameMap :
         self.renderInboxText(entityTxt, self.pxgetPos(*e.pos.toTuple()), "black", entityColor)
 
 
-    def renderLocation(l: int | Location):
+    def renderLocation(self,l: int | Location):
         if isinstance(l, int):
             l = self.locations[l.ID]
-        self.renderInboxText(f'{chr(l.ID)}', self.pxgetPos(*e.currentClient.dst.toTuple()), "black", "blue")
+        self.renderInboxText(f'{chr(l.ID)}', self.pxgetPos(*l.pos.toTuple()), "black", "blue")
 
 
     def pxgetPos(self, x: int | float, y: int | float) -> tuple:

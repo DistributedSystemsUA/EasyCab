@@ -12,10 +12,10 @@ def socket_client():
     # Crear socket
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect((HOST, PORT))
-
+    print("Conectado con taxi")
     try:
         while True:
-            time.sleep(randint(3,5))
+            time.sleep(randint(6,10))
             if randint(0,1) == 0:
                 client_socket.send(bytearray([BEL,randint(1,3)]))
 

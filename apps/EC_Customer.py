@@ -17,19 +17,26 @@ def enviarMensajes(ind):
     global peticiones
 
     producer = KafkaProducer(bootstrap_servers= ip)
-    producer.send('clientes', peticiones[ind].encode('utf-8'))
+    if isinstance(ind, int):
+        producer.send('clientes', peticiones[ind].encode('utf-8'))
+    else:
+        producer.send('clientes', f"{id} {ind}".encode('utf-8'))
     producer.flush()
     producer.close()
 
 def recibirMensajes():
     global peticiones
     global ind
+
+    en_curso = False
+    direccion = ""
+
     consumer = KafkaConsumer(
         f'clientes{id}',
         bootstrap_servers= ip,
-        auto_offset_reset='earliest',
+        auto_offset_reset='latest',
         enable_auto_commit=True,
-        group_id='my-group'
+        group_id='clientes_recibir'
     )
 
     for message in consumer:
@@ -37,13 +44,29 @@ def recibirMensajes():
         mens = message.value.decode('utf-8')
         if mens == "OK":
             if len(peticiones) != 0:
-                peticiones.pop(ind)
-        elif len(peticiones) > 0 and mens == "KO":
+                direccion = peticiones.pop(ind)
+                en_curso = True
+
+        elif len(peticiones) > 0 and mens == "KO" and en_curso == False:
             time.sleep(4)
             ind += 1  # Incrementa el índice
             if ind >= len(peticiones):  # Verifica después de incrementar
                 ind = 0  # Reinicia el índice si se sale del rango
             enviarMensajes(ind)
+        
+        elif mens == "Servicio Completado":
+            print(f"El cliente ya ha llegado a {direccion}")
+            en_curso = False
+
+            if len(peticiones) == 0:
+                print("Todas las peticiones completadas")
+                enviarMensajes("Todas_las_peticiones_completadas")
+                exit()
+            else:
+                time.sleep(4)
+                if ind >= len(peticiones):  # Verifica después de incrementar
+                    ind = 0  # Reinicia el índice si se sale del rango
+                enviarMensajes(ind)
 
 
 

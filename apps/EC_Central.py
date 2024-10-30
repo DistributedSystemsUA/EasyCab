@@ -10,123 +10,7 @@ import argparse
 import sqlite3
 from random import randint
 
-global ip
-
-# Constantes para el protocolo
-STX = '\x02'
-ETX = '\x03'
-ACK = '\x06'
-NACK = '\x15'
-
-# Calcula LRC (XOR de todos los bytes del mensaje)
-def calcular_lrc(mensaje):
-    lrc = 0
-    for char in mensaje:
-        lrc ^= ord(char)
-    return chr(lrc)
-
-# Función para desempaquetar y verificar mensajes
-def desempaquetar_mensaje(mensaje):
-    if mensaje[0] == STX and mensaje[-2] == ETX:
-        data = mensaje[1:-2]  # Extraemos el DATA
-        lrc_recibido = mensaje[-1]
-        mensaje_completo = mensaje[:-1]  # Sin el LRC
-        lrc_calculado = calcular_lrc(mensaje_completo)
-        if lrc_recibido == lrc_calculado:
-            return data, True
-        else:
-            return data, False
-    return None, False
-
-def manejar_taxi(conexion, direccion):
-    print(f"Autenticando taxi desde {direccion}...")
-    mensaje = conexion.recv(1024).decode('utf-8')
-    
-    data, valido = desempaquetar_mensaje(mensaje)
-    if valido:
-        print(f"Taxi autenticado correctamente con ID: {data}")
-        #Añade los taxis a la BD
-        conn = sqlite3.connect('EasyCab.db')
-        cursor = conn.cursor()
-        
-        # Insertar un nuevo taxi en la tabla Taxis
-        cursor.execute('''
-        INSERT INTO Taxis (ID,estado)
-        VALUES (?, ?)
-        ''', (int(data),0))
-        
-        # Guardar los cambios
-        conn.commit()
-        
-        # Cerrar la conexión
-        conn.close()
-
-        producer = KafkaProducer(bootstrap_servers= ip)
-        producer.send('imprimirT', (f"{data}").encode('utf-8'))
-        producer.flush()
-        producer.close()
-
-
-        conexion.send(ACK.encode('utf-8'))
-    else:
-        print("Error en el mensaje, enviando NACK.")
-        conexion.send(NACK.encode('utf-8'))
-    conexion.close()
-
-def ec_central():
-    servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    servidor.bind(('0.0.0.0', 8888))  # Puerto para EC_Central
-    servidor.listen(5)
-    print("EC_Central esperando taxis...")
-    
-    while True:
-        conexion, direccion = servidor.accept()
-        manejar_taxi(conexion, direccion)
-
-
-
-def imprimirPosiciones(posiciones):
-    pass
-    
-
-def escucha_clientes():
-    #ip = input("Dame la ip que va a usar kafka: ")
-    #ip += ":9092"
-
-    conn = sqlite3.connect('EasyCab.db')
-    cursor = conn.cursor()
-    
-    print(ip)
-
-    consumer = KafkaConsumer(
-        'clientes',
-        bootstrap_servers= ip,
-        auto_offset_reset='latest',
-        enable_auto_commit=True,
-        group_id='my-group'
-    )
-
-    producer = KafkaProducer(bootstrap_servers= ip)
-
-    for message in consumer:
-        peticion= f"{message.value.decode('utf-8')}"
-        datos = peticion.strip().split()
-
-        if peticion != "":
-            cursor.execute("SELECT ID FROM Posicion WHERE ID = ?", (datos[1],))
-            ids = cursor.fetchone()
-            cursor.execute("SELECT ID FROM Taxis WHERE estado = ?", (1,))
-            tx = cursor.fetchall()
-            if ids[0] == datos[1] and len(tx) >= 1:
-                producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
-                producer.send('imprimirC',(f"{datos[1]}").encode('utf-8'))
-            else:
-                producer.send(f'clientes{datos[0]}', ("KO").encode('utf-8'))
-    
-    producer.close()
-
-def escucha_Taxi():
-    pass
+from confluent_kafka.admin import AdminClient
 
 #------------------------------------------------------------------------------------------------------------
 def servidor_central(puerto_central):
@@ -182,6 +66,8 @@ def cargarPosiciones():
     conn.close()
 #-----------------------------------------------------------------------------------------------------------------
 def cargarClientes(ip):
+    global idClientes
+
     conn = sqlite3.connect('EasyCab.db')
     cursor = conn.cursor()
 
@@ -190,25 +76,43 @@ def cargarClientes(ip):
         bootstrap_servers= ip,
         auto_offset_reset='latest',
         enable_auto_commit=True,
-        group_id='my-group'
+        group_id='cargar_Cliente'
     )
 
     producer = KafkaProducer(bootstrap_servers= ip)
 
     for message in consumer:
         peticion= f"{message.value.decode('utf-8')}"
-        datos = peticion.strip().split()
 
-        if peticion != "":
+        datos = peticion.strip().split()
+        print(datos[1])
+        if datos[1] == "Todas_las_peticiones_completadas":
+            for i in idClientes:
+                if i[0] == datos[0]:
+                    taxi = engine.gameMap.entities.get(i[1])
+                    engine.gameMap.removeEntity(taxi)
+                    idClientes.remove(i)
+
+        if peticion != "" and datos[1] != "Todas_las_peticiones_completadas":
             cursor.execute("SELECT ID FROM Posicion WHERE ID = ?", (datos[1],))
             ids = cursor.fetchone()
             cursor.execute("SELECT ID FROM Taxis WHERE estado = ?", (0,))
             tx = cursor.fetchall()
             if ids[0] == datos[1] and len(tx) >= 1:
+                time.sleep(2)
                 producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
                 cursor.execute("SELECT x,y FROM Posicion WHERE ID = ?", (datos[1],))
                 data = cursor.fetchone()
-                engine.gameMap.addEntities(entities.Client(entities.Position(randint(1,21), randint(1,21)), entities.Position(int(data[0]), int(data[1]))))
+                if len(idClientes) == 0 or not(any(tupla[0] == datos[0] for tupla in idClientes)):
+                    engine.gameMap.addEntities(entities.Client(entities.Position(randint(1,21), randint(1,21)), entities.Position(int(data[0]), int(data[1]))))
+                    time.sleep(3)
+                    todoslosCliente = [entity for entity in engine.gameMap.entities.values() if isinstance(entity, entities.Client)]
+                    #print(len(todoslosCliente))
+                    idClientes.append((datos[0],todoslosCliente[-1].id))
+                else:
+                    for cliente in idClientes:
+                        if cliente[0] == datos[0]:
+                            engine.gameMap.entities.get(cliente[1]).dst = entities.Position(int(data[0]), int(data[1]))
             else:
                 producer.send(f'clientes{datos[0]}', ("KO").encode('utf-8'))
     
@@ -223,7 +127,36 @@ def actualizar_estado_taxi(taxi_id, estado):
     conexion.commit()
     conexion.close()
 
-def moverTaxis():
+# Funcion saber cuando frenar los taxis
+def paraTaxi(ip):
+    global pararT
+
+    insertar = True
+
+    consumer = KafkaConsumer(
+        'pararTaxi',
+        bootstrap_servers= ip,
+        auto_offset_reset='latest',
+        enable_auto_commit=True,
+        group_id='cargar_Cliente'
+    )
+    for message in consumer:
+        peticion= f"{message.value.decode('utf-8')}"
+        datos = peticion.strip().split()
+        for t in pararT:
+            if t[1] == datos[1]:
+                insertar = False
+
+        if insertar == True:
+            pararT.append([datos[0],datos[1]])
+
+def moverTaxis(ip):
+    global pararT
+    global idClientes
+    producer = KafkaProducer(bootstrap_servers= ip)
+
+    asociacionClienteTaxi = []
+
     while engine.isRunning:
         taxis = [e for e in engine.gameMap.entities.values() if isinstance(e, entities.Taxi)]
         clientes_sin_taxi = [cliente for cliente in engine.gameMap.entities.values() if isinstance(cliente, entities.Client) and cliente.currentTaxi is None]
@@ -232,27 +165,78 @@ def moverTaxis():
             if e.currentClient is None and len(clientes_sin_taxi) > 0:
                 cliente = clientes_sin_taxi.pop(0)
                 e.assignClient(cliente)
-                print(f"Taxi {e.id} ha tomado al cliente {cliente.id}")
-                
-                actualizar_estado_taxi(e.id, 1)
+                if e.currentClient is not None:
+                    print(f"Taxi {e.id} ha tomado al cliente {chr(cliente.id)}")
+                    asociacionClienteTaxi.append((e.id, e.currentClient.id))
+                actualizar_estado_taxi(e.id, e.logType)
         
         l = [e for _, e in engine.gameMap.entities.items()]
         for e in l:
             if isinstance(e, entities.Taxi):
-                e.move()
+                for t in pararT:
+                    if t[0] == 0:
+                        pararT.remove(t)
+
+                if any(t[1] == e.id for t in pararT):
+                    e.stop()
+                    for t in pararT:
+                        if t[1] == e.id:
+                            t[0] -= 1
+                else:
+                    e.move()
+
+                actualizar_estado_taxi(e.id, e.logType)
+                if e.logType == 0:
+                    for CT in asociacionClienteTaxi:
+                        if CT[0] == e.id:
+                            print("entro servicio completo")
+                            cli = [c for c in idClientes if c[1] == CT[1]]
+                            producer.send(f'clientes{cli[0][0]}', ("Servicio Completado").encode('utf-8'))
+                            asociacionClienteTaxi.remove(CT)
             time.sleep(1)
         
 
 #-----------------------------------------------------------------------------------------------------------------
 def main():
+    # Configurar el cliente administrador de Kafka
+    admin_client = AdminClient({
+        "bootstrap.servers": args.kafka
+    })
+
+    nombres_taxis = [f"taxi{i}" for i in range(1, 100)]
+    nombres_clientes = [f"clientes{i}" for i in range(1, 100)]
+
+    # Combinar todos los topics (taxis y clientes)
+    topics_to_delete = ["clientes","pararTaxi"] + nombres_taxis + nombres_clientes
+
+    # Intentar eliminar los topics
+    futures = admin_client.delete_topics(topics_to_delete)
+
+    # Manejar posibles errores al borrar los topics
+    for topic, future in futures.items():
+        try:
+            future.result()  # Esto lanza una excepción si hay un error
+            print(f"Topic {topic} eliminado correctamente.")
+        except Exception as e:
+            pass
+            #if "UNKNOWN_TOPIC_OR_PART" in str(e):
+            #    print(f"El topic {topic} no existe. Continuando con el siguiente.")
+            #else:
+            #    print(f"Error inesperado al intentar eliminar el topic {topic}: {e}")
+
     cargarPosiciones()
     hilo_servidor = threading.Thread(target=servidor_central, args=(args.puerto_central,))
     hilo_servidor.start()
     hilo_cliente = threading.Thread(target=cargarClientes, args=(args.kafka,))
     hilo_cliente.start()
-    moverTaxis()
+    hilo_pararT= threading.Thread(target=paraTaxi, args=(args.kafka,))
+    hilo_pararT.start()
+    moverTaxis(args.kafka)
     
 if __name__ == "__main__":
+    idClientes = []
+    pararT = []
+
     connInit = sqlite3.connect('EasyCab.db')
     cursorInit = connInit.cursor()
     cursorInit.execute("DELETE FROM Taxis")
