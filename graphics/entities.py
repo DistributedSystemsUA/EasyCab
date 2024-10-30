@@ -50,7 +50,7 @@ class Taxi(Entity):
     def move(self):
         if self.dst is None: return
         if self.logType == LogType.INCONVENIENCE.value:
-            self.logType == LogType.BUSY.value
+            self.logType = LogType.BUSY.value
 
         self.lock.acquire()
         oldPosition = self.pos # old pos immutable = mem security

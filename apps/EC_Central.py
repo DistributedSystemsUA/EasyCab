@@ -131,8 +131,6 @@ def actualizar_estado_taxi(taxi_id, estado):
 def paraTaxi(ip):
     global pararT
 
-    insertar = True
-
     consumer = KafkaConsumer(
         'pararTaxi',
         bootstrap_servers= ip,
@@ -143,12 +141,13 @@ def paraTaxi(ip):
     for message in consumer:
         peticion= f"{message.value.decode('utf-8')}"
         datos = peticion.strip().split()
+        insertar = True
         for t in pararT:
             if t[1] == datos[1]:
                 insertar = False
 
         if insertar == True:
-            pararT.append([datos[0],datos[1]])
+            pararT.append([int(datos[0]),int(datos[1])])
 
 def moverTaxis(ip):
     global pararT
@@ -177,7 +176,7 @@ def moverTaxis(ip):
                     if t[0] == 0:
                         pararT.remove(t)
 
-                if any(t[1] == e.id for t in pararT):
+                if any(t[1] == e.id and e.logType != 0 for t in pararT):
                     e.stop()
                     for t in pararT:
                         if t[1] == e.id:
