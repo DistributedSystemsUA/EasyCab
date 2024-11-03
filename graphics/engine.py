@@ -46,7 +46,7 @@ def start_passive(socket_app: Callable, e: Entity):
     global pointedEntity
 
     display = _initObjects(socket_app)
-    pointedentity = e
+    pointedEntity = e
 
     while True:
         event = pygame.event.wait()

@@ -142,6 +142,8 @@ def escucha_mapa():
 
 def main():
     validarTaxi(args.ip_central,args.puerto_central,args.id_taxi)
+    engine.gameMap.addEntities(entities.Taxi(args.id_taxi,entities.Position(1,1)))
+    engine.pointedEntity = engine.gameMap.entities[args.id_taxi]
     Hilo_M = threading.Thread(target=escucha_mapa)
     Hilo_M.start()
     Hilo_M.join()  # Espera a que Hilo_M termine
@@ -162,8 +164,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     args = parser.parse_args()
-
-    engine.start(main)
+    
+    engine.start_passive(main,None)
+    #engine.start(main)
     
 
     
