@@ -2,6 +2,7 @@ import pygame
 import threading
 from random import randint
 from typing import Callable
+from collections import namedtuple
 
 from entities import *
 from game_map import *
@@ -17,7 +18,7 @@ isRunning: bool = True
 pointedEntity: Entity = None
 gameMap: GameMap = None
 uiFont: pygame.font.Font = None
-entityControls: list[tuple[pygame.Rect, Callable]] = []
+entityControls: list[tuple[pygame.Rect, str, Callable]] = [None, None]
 
 
 def start(socket_app: Callable):
@@ -140,7 +141,7 @@ def _initObjects(socket_app: Callable) -> pygame.Surface:
 def _processClick(x, y):
     global pointedEntity
     global entityControls
-    BUTTON = 0; FUNC = 1
+    BUTTON = 0; FUNC = 2
     loc = gameMap.getBoxLoc(x, y)
 
     if loc is not None and (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
@@ -153,12 +154,14 @@ def _processClick(x, y):
 
         if not isTaxi:
             pointedEntity = l[0]
-    else:
+    elif pointedEntity is not None:
         for control in entityControls:
-            if control[BUTTON].collidePoint(x, y):
+            if control[BUTTON].collidepoint(x, y):
                 control[FUNC]() # Do something with pointedEntity
                 return
         pointedEntity = None
+        for i in range(len(entityControls)):
+            entityControls[i] = None
 
 
 def _drawEntityPointer(display: pygame.Surface):
@@ -271,7 +274,7 @@ def _drawEntityInfo(display: pygame.Surface):
     widgetWidth = (display.get_width() / 3) - (display.get_width() * 0.08)
 
     entityHasEntity = _curEntityIsBusy()
-    widgetHeight = gameMap.pxboxWidth * (9 if entityHasEntity else 7)
+    widgetHeight = gameMap.pxboxWidth * (9 if entityHasEntity else 7) - (2 if PASSIVE_MODE else 0)
     borderRadius = display.get_height() * 0.03
 
     pygame.draw.rect(display, "white", pygame.Rect(px_x, px_y, widgetWidth, widgetHeight), width=2, border_radius=int(borderRadius))
@@ -292,11 +295,28 @@ def _drawEntityInfo(display: pygame.Surface):
     for p in obj_properties:
        aux_y += gameMap.pxboxWidth
        display.blit(uiFont.render(p, True, "white"), (aux_x, aux_y))
+    aux_y += gameMap.pxboxWidth
 
-    #TODO: show buttons if not passive mode
-    if not PASSIVE_MODE:
-        pass #TODO: draw buttons
-        #TODO: first calculate actual position in terms on how to print
+    if not PASSIVE_MODE and isinstance(pointedEntity, Taxi):
+        widgetMiddle = px_x + (widgetWidth / 2)
+        buttonOffset = (widgetWidth * 0.1)
+        buttonWidth = (widgetWidth / 2) - buttonOffset
+        # Shrink button offset to fit buttons
+        buttonOffset /= 2
+
+        entityControls[0] = (pygame.Rect(px_x + buttonOffset, aux_y, buttonWidth, gameMap.pxboxWidth), "Parar/Reanudar", _swapPointedEntityCanMove)
+        entityControls[1] = (pygame.Rect(widgetMiddle + buttonOffset, aux_y, buttonWidth, gameMap.pxboxWidth), "Ir a central", _returnPointedEntityToBase)
+        if isinstance(pointedEntity, Taxi):
+            for bt, msg, _ in entityControls:
+                _renderTxtBox(display, bt.left, bt.top, bt.width, bt.height, (1, msg, "white"))
+
+
+def _swapPointedEntityCanMove():
+    pass #TODO: make functions usa kafka
+
+
+def _returnPointedEntityToBase():
+    pass
 
 
 def _getUsablePointedEntityLocation() -> tuple[int, int]:
