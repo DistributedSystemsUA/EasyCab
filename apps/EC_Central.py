@@ -335,6 +335,32 @@ def pasarMapa(ip):
     time.sleep(15)
 
 #-----------------------------------------------------------------------------------------------------------------
+def botones(ip):
+
+    consumer = KafkaConsumer(
+        'botones',
+        bootstrap_servers= ip,
+        auto_offset_reset='latest',
+        enable_auto_commit=True,
+        group_id='botones'
+    )
+
+    parar_seguir = 0x01
+    volver_base = 0x02
+    ir_posicion = 0x03
+
+    for message in consumer:
+        peticion= f"{message.value.decode('utf-8')}"
+        datos = peticion.strip().split()
+
+        if datos[0] == parar_seguir:
+            pass
+        elif datos[0] == volver_base:
+            pass
+        elif datos[0] == ir_posicion:
+            pass
+        
+#-----------------------------------------------------------------------------------------------------------------
 def main():
     # Configurar el cliente administrador de Kafka
     admin_client = AdminClient({
@@ -345,7 +371,7 @@ def main():
     nombres_clientes = [f"clientes{i}" for i in range(1, 100)]
 
     # Combinar todos los topics (taxis y clientes)
-    topics_to_delete = ["clientes","pararTaxi","enviar_mapa","escucha_mapa"] + nombres_taxis + nombres_clientes
+    topics_to_delete = ["clientes","pararTaxi","enviar_mapa","escucha_mapa","botones"] + nombres_taxis + nombres_clientes
 
     # Intentar eliminar los topics
     futures = admin_client.delete_topics(topics_to_delete)
