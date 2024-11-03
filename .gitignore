@@ -1,2 +1,4 @@
 kafka/*
 __pycache__/
+dist/
+build/
