@@ -1,5 +1,6 @@
 from path_load import *
 
+import json
 import socket
 from kafka import KafkaConsumer,KafkaProducer
 import engine
@@ -13,13 +14,20 @@ from random import randint
 from confluent_kafka.admin import AdminClient
 
 #------------------------------------------------------------------------------------------------------------
-def servidor_central(puerto_central):
+def servidor_central(puerto_central,ip):
+    global pausar
+    producer = KafkaProducer(bootstrap_servers= ip)
+
     servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     servidor.bind(("localhost", puerto_central))  # Se asocia a todas las interfaces disponibles en la máquina
     servidor.listen(5)
     print(f"EC_Central escuchando en el puerto {puerto_central}...")
 
     while True:
+        if pausar == True:
+            time.sleep(15)
+            pausar = False
+
         conexion, direccion = servidor.accept()  # Acepta la conexión entrante
         print(f"Conexión establecida con {direccion}")
 
@@ -45,8 +53,13 @@ def servidor_central(puerto_central):
         conexion.close()
 
         engine.gameMap.addEntities(entities.Taxi(int(id_taxi),entities.Position(1,1)))
+        time.sleep(3)
+        producer.send('escucha_mapa', (f"Crear_Taxi {id_taxi}").encode('utf-8'))
+        pasarMapa(ip)
 #-----------------------------------------------------------------------------------------------------------------
-def cargarPosiciones():
+def cargarPosiciones(ip):
+    producer = KafkaProducer(bootstrap_servers= ip)
+
     conn = sqlite3.connect('EasyCab.db')
     cursor = conn.cursor()
     fichero = open('mapaConf.txt','r')
@@ -58,6 +71,7 @@ def cargarPosiciones():
             if cursor.fetchone()[0] == 0:  # Si no existe, insertar
                 cursor.execute("INSERT INTO Posicion (ID, x, y) VALUES (?, ?, ?)", (data[0], data[1], data[2]))
                 engine.gameMap.addLocations(entities.Location(ID=ord(data[0]), pos=entities.Position(int(data[1]), int(data[2]))))
+                #producer.send('escucha_mapa', (f"Crear_Localizacion {data[0]} {data[1]} {data[2]}").encode('utf-8'))
             else:
                 print(f"ID {data[0]} ya existe. No se inserta.")
     fichero.close()
@@ -67,6 +81,8 @@ def cargarPosiciones():
 #-----------------------------------------------------------------------------------------------------------------
 def cargarClientes(ip):
     global idClientes
+    global pausar
+    global creandoCliente
 
     conn = sqlite3.connect('EasyCab.db')
     cursor = conn.cursor()
@@ -82,6 +98,10 @@ def cargarClientes(ip):
     producer = KafkaProducer(bootstrap_servers= ip)
 
     for message in consumer:
+        if pausar == True:
+            time.sleep(15)
+            pausar = False
+
         peticion= f"{message.value.decode('utf-8')}"
 
         datos = peticion.strip().split()
@@ -89,8 +109,10 @@ def cargarClientes(ip):
         if datos[1] == "Todas_las_peticiones_completadas":
             for i in idClientes:
                 if i[0] == datos[0]:
-                    taxi = engine.gameMap.entities.get(i[1])
-                    engine.gameMap.removeEntity(taxi)
+                    cliente = engine.gameMap.entities.get(i[1])
+                    engine.gameMap.removeEntity(cliente)
+                    time.sleep(2)
+                    producer.send('escucha_mapa', (f"Borrar_Cliente {i[1]}").encode('utf-8'))
                     idClientes.remove(i)
 
         if peticion != "" and datos[1] != "Todas_las_peticiones_completadas":
@@ -98,22 +120,47 @@ def cargarClientes(ip):
             ids = cursor.fetchone()
             cursor.execute("SELECT ID FROM Taxis WHERE estado = ?", (0,))
             tx = cursor.fetchall()
-            if ids[0] == datos[1] and len(tx) >= 1:
+            if ids[0] == datos[1]:# and len(tx) >= 1:
                 time.sleep(2)
-                producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
+                #producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
                 cursor.execute("SELECT x,y FROM Posicion WHERE ID = ?", (datos[1],))
                 data = cursor.fetchone()
                 if len(idClientes) == 0 or not(any(tupla[0] == datos[0] for tupla in idClientes)):
-                    engine.gameMap.addEntities(entities.Client(entities.Position(randint(1,21), randint(1,21)), entities.Position(int(data[0]), int(data[1]))))
+                    posicion_x = randint(1,20)
+                    posicion_y = randint(1,20)
+
+                    creandoCliente = True
+                    engine.gameMap.addEntities(entities.Client(entities.Position(posicion_x, posicion_y), entities.Position(int(data[0]), int(data[1]))))
                     time.sleep(3)
                     todoslosCliente = [entity for entity in engine.gameMap.entities.values() if isinstance(entity, entities.Client)]
+                    time.sleep(2)
                     #print(len(todoslosCliente))
-                    idClientes.append((datos[0],todoslosCliente[-1].id))
+                    idClientes.append([datos[0],todoslosCliente[-1].id,0])
+
+                    #time.sleep(3)
+                    pasarMapa(ip)
+                    producer.send('escucha_mapa', (f"Crear_Cliente {posicion_x} {posicion_y} {data[0]} {data[1]} {todoslosCliente[-1].id}").encode('utf-8'))
+
+                    #if len(tx) >= 1:
+                    #    time.sleep(2)
+                    #    producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
+                    #else:
+                    #    time.sleep(2)
+                    #    producer.send(f'clientes{datos[0]}', ("KO").encode('utf-8'))
+
                 else:
                     for cliente in idClientes:
                         if cliente[0] == datos[0]:
                             engine.gameMap.entities.get(cliente[1]).dst = entities.Position(int(data[0]), int(data[1]))
+                            producer.send('escucha_mapa', (f"Cambiar_Cliente {cliente[1]} {data[0]} {data[1]}").encode('utf-8'))
+                            #if len(tx) >= 1:
+                            #    time.sleep(2)
+                            #    producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
+                            #else:
+                            #    time.sleep(2)
+                            #    producer.send(f'clientes{datos[0]}', ("KO").encode('utf-8'))
             else:
+                time.sleep(2)
                 producer.send(f'clientes{datos[0]}', ("KO").encode('utf-8'))
     
     producer.close()
@@ -130,6 +177,7 @@ def actualizar_estado_taxi(taxi_id, estado):
 # Funcion saber cuando frenar los taxis
 def paraTaxi(ip):
     global pararT
+    global pausar
 
     consumer = KafkaConsumer(
         'pararTaxi',
@@ -139,6 +187,10 @@ def paraTaxi(ip):
         group_id='cargar_Cliente'
     )
     for message in consumer:
+        if pausar == True:
+            time.sleep(15)
+            pausar = False
+
         peticion= f"{message.value.decode('utf-8')}"
         datos = peticion.strip().split()
         insertar = True
@@ -152,22 +204,44 @@ def paraTaxi(ip):
 def moverTaxis(ip):
     global pararT
     global idClientes
+    global pausar
+    global creandoCliente
+
     producer = KafkaProducer(bootstrap_servers= ip)
 
     asociacionClienteTaxi = []
 
     while engine.isRunning:
+        if pausar == True:
+            time.sleep(15)
+            pausar = False
+
         taxis = [e for e in engine.gameMap.entities.values() if isinstance(e, entities.Taxi)]
         clientes_sin_taxi = [cliente for cliente in engine.gameMap.entities.values() if isinstance(cliente, entities.Client) and cliente.currentTaxi is None]
         
         for e in taxis:
             if e.currentClient is None and len(clientes_sin_taxi) > 0:
+                if creandoCliente == True:
+                    time.sleep(20)
+                    creandoCliente = False
+
                 cliente = clientes_sin_taxi.pop(0)
                 e.assignClient(cliente)
+                producer.send('escucha_mapa', (f"TaxiCogeCliente {e.id} {cliente.id}").encode('utf-8'))
                 if e.currentClient is not None:
-                    print(f"Taxi {e.id} ha tomado al cliente {chr(cliente.id)}")
+                    time.sleep(3)
+                    for customer in idClientes:
+                        if customer[1] == e.currentClient.id:
+                            time.sleep(2)
+                            producer.send(f'clientes{customer[0]}', ("OK").encode('utf-8'))
+                            print(f"Taxi {e.id} ha tomado al cliente {customer[0]}")
+                            customer[2] = 1
                     asociacionClienteTaxi.append((e.id, e.currentClient.id))
                 actualizar_estado_taxi(e.id, e.logType)
+
+        for customer in idClientes:
+            if customer[2] == 0:
+                producer.send(f'clientes{customer[0]}', ("KO").encode('utf-8'))
         
         l = [e for _, e in engine.gameMap.entities.items()]
         for e in l:
@@ -178,11 +252,13 @@ def moverTaxis(ip):
 
                 if any(t[1] == e.id and e.logType != 0 for t in pararT):
                     e.stop()
+                    producer.send('escucha_mapa', (f"Parar_taxi {e.id}").encode('utf-8'))
                     for t in pararT:
                         if t[1] == e.id:
                             t[0] -= 1
                 else:
                     e.move()
+                    producer.send('escucha_mapa', (f"Mover_taxi {e.id}").encode('utf-8'))
 
                 actualizar_estado_taxi(e.id, e.logType)
                 if e.logType == 0:
@@ -191,9 +267,72 @@ def moverTaxis(ip):
                             print("entro servicio completo")
                             cli = [c for c in idClientes if c[1] == CT[1]]
                             producer.send(f'clientes{cli[0][0]}', ("Servicio Completado").encode('utf-8'))
+                            for customer in idClientes:
+                                if customer[0] == cli[0][0]:
+                                    customer[2] = 0
                             asociacionClienteTaxi.remove(CT)
             time.sleep(1)
+
+#-----------------------------------------------------------------------------------------------------------------
+def pasarMapa(ip):
+    global pausar
+
+    print("paso de aqui")
+    
+    producer = KafkaProducer(bootstrap_servers=ip, value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+
+    ubicaciones = []
+    taxis = []
+    clientes = []
+
+    todas_las_ubicaciones = engine.gameMap.locations.values()
+    for ubi in todas_las_ubicaciones:
+        ubicaciones.append({"id":ubi.ID, "x": ubi.pos.x, "y":ubi.pos.y})
         
+    for entidad in engine.gameMap.entities.values():
+        if isinstance(entidad, entities.Taxi):
+            taxis.append({"id": entidad.id, "x": entidad.pos.x, "y": entidad.pos.y})#,"estado":entidad.logType})
+        elif isinstance(entidad, entities.Client):
+            # Verificar si 'dst' no es None antes de acceder a 'dst.x' y 'dst.y'
+            if entidad.dst is not None:
+                clientes.append({
+                    "id": entidad.id,
+                    "x_p": entidad.pos.x,
+                    "y_p": entidad.pos.y,
+                    "x_d": entidad.dst.x,
+                    "y_d": entidad.dst.y
+                })
+            elif entidad.pos is not None:
+                clientes.append({
+                    "id": entidad.id,
+                    "x_p": entidad.pos.x,
+                    "y_p": entidad.pos.y,
+                    "x_d": None,  # Puedes asignar 'None' o algún valor predeterminado
+                    "y_d": None
+                })
+            else:
+                clientes.append({
+                    "id": entidad.id,
+                    "x_p": None,
+                    "y_p": None,
+                    "x_d": None,  # Puedes asignar 'None' o algún valor predeterminado
+                    "y_d": None
+                })
+
+
+    orden = {
+        "ubicaciones": ubicaciones,
+        "taxis":taxis,
+        "clientes":clientes
+    }
+
+    print("Envio")
+    producer.send('enviar_mapa', orden)
+    producer.flush()
+    producer.close()
+
+    pausar = True
+    time.sleep(15)
 
 #-----------------------------------------------------------------------------------------------------------------
 def main():
@@ -206,7 +345,7 @@ def main():
     nombres_clientes = [f"clientes{i}" for i in range(1, 100)]
 
     # Combinar todos los topics (taxis y clientes)
-    topics_to_delete = ["clientes","pararTaxi"] + nombres_taxis + nombres_clientes
+    topics_to_delete = ["clientes","pararTaxi","enviar_mapa","escucha_mapa"] + nombres_taxis + nombres_clientes
 
     # Intentar eliminar los topics
     futures = admin_client.delete_topics(topics_to_delete)
@@ -223,8 +362,8 @@ def main():
             #else:
             #    print(f"Error inesperado al intentar eliminar el topic {topic}: {e}")
 
-    cargarPosiciones()
-    hilo_servidor = threading.Thread(target=servidor_central, args=(args.puerto_central,))
+    cargarPosiciones(args.kafka)
+    hilo_servidor = threading.Thread(target=servidor_central, args=(args.puerto_central,args.kafka))
     hilo_servidor.start()
     hilo_cliente = threading.Thread(target=cargarClientes, args=(args.kafka,))
     hilo_cliente.start()
@@ -235,6 +374,13 @@ def main():
 if __name__ == "__main__":
     idClientes = []
     pararT = []
+
+    #Variables para sincronizar mapa y pausar eventos.
+    #pause_event = threading.Event()
+    #pause_event.set()  # Inicialmente en modo "continuar"
+
+    pausar = False
+    creandoCliente = False
 
     connInit = sqlite3.connect('EasyCab.db')
     cursorInit = connInit.cursor()

@@ -1,17 +1,16 @@
 import socket
+import argparse
 import time
 from random import randint
 
 BEL = 0x07
 HOST = 'localhost' 
-PORT = 9991
+#PORT = 9991
 
 def socket_client():
-    
-
     # Crear socket
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((HOST, PORT))
+    client_socket.connect((HOST, args.puerto))
     print("Conectado con taxi")
     try:
         while True:
@@ -24,5 +23,10 @@ def socket_client():
         client_socket.close()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('puerto', type=int)
+
+    args = parser.parse_args()
+
     socket_client()
 
