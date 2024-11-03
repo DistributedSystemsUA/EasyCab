@@ -2,6 +2,7 @@ import pygame
 import threading
 from random import randint
 from typing import Callable
+from collections import namedtuple
 
 from entities import *
 from game_map import *
@@ -11,12 +12,13 @@ LEFT_CLICK = 1
 RIGHT_CLICK = 3
 
 MAP_WIDTH = 20
+PASSIVE_MODE = False
 
 isRunning: bool = True
 pointedEntity: Entity = None
 gameMap: GameMap = None
 uiFont: pygame.font.Font = None
-entityControls: list[tuple[pygame.Rect, Callable]] = []
+entityControls: list[tuple[pygame.Rect, str, Callable]] = [None, None]
 
 
 def start(socket_app: Callable):
@@ -40,13 +42,14 @@ def start(socket_app: Callable):
         pygame.display.flip()
 
 
-def start_passive(socket_app: Callable, e: Entity):
+def start_passive(socket_app: Callable):
     global gameMap
     global uiFont
     global pointedEntity
+    global PASSIVE_MODE
 
+    PASSIVE_MODE = True
     display = _initObjects(socket_app)
-    pointedEntity = e
 
     while True:
         event = pygame.event.wait()
@@ -138,7 +141,7 @@ def _initObjects(socket_app: Callable) -> pygame.Surface:
 def _processClick(x, y):
     global pointedEntity
     global entityControls
-    BUTTON = 0; FUNC = 1
+    BUTTON = 0; FUNC = 2
     loc = gameMap.getBoxLoc(x, y)
 
     if loc is not None and (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
@@ -151,20 +154,25 @@ def _processClick(x, y):
 
         if not isTaxi:
             pointedEntity = l[0]
-    else:
+    elif pointedEntity is not None:
         for control in entityControls:
-            if control[BUTTON].collidePoint(x, y):
+            if control[BUTTON].collidepoint(x, y):
                 control[FUNC]() # Do something with pointedEntity
                 return
         pointedEntity = None
+        for i in range(len(entityControls)):
+            entityControls[i] = None
 
 
 def _drawEntityPointer(display: pygame.Surface):
     global pointedEntity
-    if pointedEntity is None or pointedEntity.pos is None:
+    if pointedEntity is None:
+        return
+    usablePosition = _getUsablePointedEntityLocation()
+    if usablePosition is None:
         return
     lightBlue = (0, 188, 227)
-    _drawPointer(display, *pointedEntity.pos.toTuple(), lightBlue)
+    _drawPointer(display, *usablePosition, lightBlue)
 
 
 def _drawPointer(display: pygame.Surface, x: int | float, y: int | float, color):
@@ -258,24 +266,27 @@ def _drawEntityInfo(display: pygame.Surface):
     global entityControls
     global gameMap
     global uiFont
+    global PASSIVE_MODE
     if pointedEntity is None: return
 
     px_x = ((display.get_width() / 3) * 2) + (display.get_width() * 0.04)
     px_y = (display.get_height() / 2) - (gameMap.pxboxWidth * ((len(pointedEntity.__dict__) // 2) +2))
     widgetWidth = (display.get_width() / 3) - (display.get_width() * 0.08)
 
-    widgetHeight = gameMap.pxboxWidth * (len(pointedEntity.__dict__) +1) #TODO: look in representation about dictionary lengths
+    entityHasEntity = _curEntityIsBusy()
+    widgetHeight = gameMap.pxboxWidth * (9 if entityHasEntity else 7) - (2 if PASSIVE_MODE else 0)
     borderRadius = display.get_height() * 0.03
 
     pygame.draw.rect(display, "white", pygame.Rect(px_x, px_y, widgetWidth, widgetHeight), width=2, border_radius=int(borderRadius))
     obj_properties = [
         "Id: " + (str(pointedEntity.id) if type(pointedEntity) == Taxi else chr(pointedEntity.id)),
         "Current state: " + ["STANDBY", "WAITING", "BUSY", "INCONVENIENCE"][pointedEntity.logType], 
-        "Position: " + (str(pointedEntity.pos.toTuple()) if pointedEntity.pos is not None else "not located"),
+        "Position: " + str(_getUsablePointedEntityLocation()),
         "Destination: " + (str(pointedEntity.dst.toTuple()) if pointedEntity.dst is not None else "none")
     ]
 
-    #TODO: dinamically add properties
+    if entityHasEntity:
+        obj_properties.append("Current " + ("taxi: " + str(pointedEntity.currentTaxi.id) if isinstance(pointedEntity, Client) else "client: " + str(pointedEntity.currentClient.id)))
 
     aux_x = px_x + (widgetWidth * 0.06)
     _renderTxtBox(display, px_x, px_y, widgetWidth, gameMap.pxboxWidth, (1, type(pointedEntity).__name__, "white"), visibleBox = False)
@@ -284,8 +295,40 @@ def _drawEntityInfo(display: pygame.Surface):
     for p in obj_properties:
        aux_y += gameMap.pxboxWidth
        display.blit(uiFont.render(p, True, "white"), (aux_x, aux_y))
+    aux_y += gameMap.pxboxWidth
 
-    #TODO: Finish to draw buttons and add functions (could be lambdas
+    if not PASSIVE_MODE and isinstance(pointedEntity, Taxi):
+        widgetMiddle = px_x + (widgetWidth / 2)
+        buttonOffset = (widgetWidth * 0.1)
+        buttonWidth = (widgetWidth / 2) - buttonOffset
+        # Shrink button offset to fit buttons
+        buttonOffset /= 2
+
+        entityControls[0] = (pygame.Rect(px_x + buttonOffset, aux_y, buttonWidth, gameMap.pxboxWidth), "Parar/Reanudar", _swapPointedEntityCanMove)
+        entityControls[1] = (pygame.Rect(widgetMiddle + buttonOffset, aux_y, buttonWidth, gameMap.pxboxWidth), "Ir a central", _returnPointedEntityToBase)
+        if isinstance(pointedEntity, Taxi):
+            for bt, msg, _ in entityControls:
+                _renderTxtBox(display, bt.left, bt.top, bt.width, bt.height, (1, msg, "white"))
+
+
+def _swapPointedEntityCanMove():
+    pass #TODO: make functions usa kafka
+
+
+def _returnPointedEntityToBase():
+    pass
+
+
+def _getUsablePointedEntityLocation() -> tuple[int, int]:
+    if isinstance(pointedEntity, Client) and pointedEntity.currentTaxi is not None and pointedEntity.logType == LogType.BUSY.value:
+        return pointedEntity.currentTaxi.pos.toTuple()
+
+    return pointedEntity.pos.toTuple() if pointedEntity.pos is not None else None
+
+
+def _curEntityIsBusy() -> bool:
+    return (isinstance(pointedEntity, Taxi) and pointedEntity.currentClient is not None) or \
+        (isinstance(pointedEntity, Client) and pointedEntity.currentTaxi is not None) and pointedEntity.logType == LogType.BUSY.value
 
 
 # IMPORTANT: the first tuple argument is the portion of the space taken, must be a float between 0 and 1
