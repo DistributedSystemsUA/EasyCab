@@ -3,6 +3,7 @@ import threading
 from random import randint
 from typing import Callable
 from collections import namedtuple
+from kafka import KafkaConsumer, KafkaProducer
 
 from entities import *
 from game_map import *
@@ -20,11 +21,16 @@ gameMap: GameMap = None
 uiFont: pygame.font.Font = None
 entityControls: list[tuple[pygame.Rect, str, Callable]] = [None, None]
 
+broker_ip = None
+broker_topic = "botones"
 
-def start(socket_app: Callable):
+
+def start(socket_app: Callable, ip = None):
     global gameMap
     global uiFont
+    global broker_ip
 
+    broker_ip = ip
     display = _initObjects(socket_app)
 
     while True:
@@ -42,12 +48,14 @@ def start(socket_app: Callable):
         pygame.display.flip()
 
 
-def start_passive(socket_app: Callable):
+def start_passive(socket_app: Callable, ip = None):
     global gameMap
     global uiFont
     global pointedEntity
     global PASSIVE_MODE
+    global broker_ip
 
+    broker_ip = ip
     PASSIVE_MODE = True
     display = _initObjects(socket_app)
 
@@ -312,11 +320,18 @@ def _drawEntityInfo(display: pygame.Surface):
 
 
 def _swapPointedEntityCanMove():
-    pass #TODO: make functions usa kafka
+    global broker_ip
+    global broker_topic
+
+    producer = KafkaProducer(bootstrap_servers=broker_ip)
+    producer.send(broker_topic, bytearray([0x01]))
+    producer.close()
 
 
 def _returnPointedEntityToBase():
-    pass
+    producer = KafkaProducer(bootstrap_servers=broker_ip)
+    producer.send(broker_topic, bytearray([0x02]))
+    producer.close()
 
 
 def _getUsablePointedEntityLocation() -> tuple[int, int]:
