@@ -154,8 +154,8 @@ def cerrar_programa():
 
 def main():
     validarTaxi(args.ip_central,args.puerto_central,args.id_taxi)
+    hilo_cerrar = threading.Thread(target=cerrar_programa)
     hilo_cerrar.start()
-    sensor(args.kafka,args.id_taxi)
     engine.gameMap.addEntities(entities.Taxi(args.id_taxi,entities.Position(1,1)))
     engine.pointedEntity = engine.gameMap.entities[args.id_taxi]
     Hilo_M = threading.Thread(target=escucha_mapa)
@@ -163,7 +163,7 @@ def main():
     Hilo_M.join()  # Espera a que Hilo_M termine
     Hilo_M2 = threading.Thread(target=carga_mapa)
     Hilo_M2.start()
-    hilo_cerrar = threading.Thread(target=cerrar_programa)
+    sensor(args.kafka,args.id_taxi)
 
 
 if __name__ == "__main__":
