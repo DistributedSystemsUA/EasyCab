@@ -199,5 +199,3 @@ if __name__ == "__main__":
     ind = 0
     
     engine.start_passive(main,args.kafka)
-    #engine.start(main,args.kafka)
-    #main()

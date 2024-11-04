@@ -71,7 +71,6 @@ def cargarPosiciones(ip):
             if cursor.fetchone()[0] == 0:  # Si no existe, insertar
                 cursor.execute("INSERT INTO Posicion (ID, x, y) VALUES (?, ?, ?)", (data[0], data[1], data[2]))
                 engine.gameMap.addLocations(entities.Location(ID=ord(data[0]), pos=entities.Position(int(data[1]), int(data[2]))))
-                #producer.send('escucha_mapa', (f"Crear_Localizacion {data[0]} {data[1]} {data[2]}").encode('utf-8'))
             else:
                 print(f"ID {data[0]} ya existe. No se inserta.")
     fichero.close()
@@ -120,9 +119,8 @@ def cargarClientes(ip):
             ids = cursor.fetchone()
             cursor.execute("SELECT ID FROM Taxis WHERE estado = ?", (0,))
             tx = cursor.fetchall()
-            if ids[0] == datos[1]:# and len(tx) >= 1:
+            if ids[0] == datos[1]:
                 time.sleep(2)
-                #producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
                 cursor.execute("SELECT x,y FROM Posicion WHERE ID = ?", (datos[1],))
                 data = cursor.fetchone()
                 if len(idClientes) == 0 or not(any(tupla[0] == datos[0] for tupla in idClientes)):
@@ -134,31 +132,17 @@ def cargarClientes(ip):
                     time.sleep(3)
                     todoslosCliente = [entity for entity in engine.gameMap.entities.values() if isinstance(entity, entities.Client)]
                     time.sleep(2)
-                    #print(len(todoslosCliente))
                     idClientes.append([datos[0],todoslosCliente[-1].id,0])
 
-                    #time.sleep(3)
                     pasarMapa(ip)
                     producer.send('escucha_mapa', (f"Crear_Cliente {posicion_x} {posicion_y} {data[0]} {data[1]} {todoslosCliente[-1].id}").encode('utf-8'))
-
-                    #if len(tx) >= 1:
-                    #    time.sleep(2)
-                    #    producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
-                    #else:
-                    #    time.sleep(2)
-                    #    producer.send(f'clientes{datos[0]}', ("KO").encode('utf-8'))
 
                 else:
                     for cliente in idClientes:
                         if cliente[0] == datos[0]:
                             engine.gameMap.entities.get(cliente[1]).dst = entities.Position(int(data[0]), int(data[1]))
                             producer.send('escucha_mapa', (f"Cambiar_Cliente {cliente[1]} {data[0]} {data[1]}").encode('utf-8'))
-                            #if len(tx) >= 1:
-                            #    time.sleep(2)
-                            #    producer.send(f'clientes{datos[0]}', ("OK").encode('utf-8'))
-                            #else:
-                            #    time.sleep(2)
-                            #    producer.send(f'clientes{datos[0]}', ("KO").encode('utf-8'))
+
             else:
                 time.sleep(2)
                 producer.send(f'clientes{datos[0]}', ("KO").encode('utf-8'))
@@ -208,7 +192,6 @@ def moverTaxis(ip):
     global creandoCliente
 
     global moviendoseBase
-    global boton
 
     producer = KafkaProducer(bootstrap_servers= ip)
 
@@ -326,7 +309,7 @@ def pasarMapa(ip):
                     "id": entidad.id,
                     "x_p": entidad.pos.x,
                     "y_p": entidad.pos.y,
-                    "x_d": None,  # Puedes asignar 'None' o algún valor predeterminado
+                    "x_d": None,
                     "y_d": None
                 })
             else:
@@ -334,7 +317,7 @@ def pasarMapa(ip):
                     "id": entidad.id,
                     "x_p": None,
                     "y_p": None,
-                    "x_d": None,  # Puedes asignar 'None' o algún valor predeterminado
+                    "x_d": None,
                     "y_d": None
                 })
 
@@ -355,8 +338,6 @@ def pasarMapa(ip):
 
 #-----------------------------------------------------------------------------------------------------------------
 def botones(ip):
-    global boton
-
     consumer = KafkaConsumer(
         'botones',
         bootstrap_servers= ip,
@@ -375,7 +356,6 @@ def botones(ip):
         global pararT
 
         global moviendoseBase
-        global boton
 
         data = message.value  # El mensaje en bytes
         # Decodifica o procesa los bytes según lo necesites
@@ -433,10 +413,6 @@ def main():
             print(f"Topic {topic} eliminado correctamente.")
         except Exception as e:
             pass
-            #if "UNKNOWN_TOPIC_OR_PART" in str(e):
-            #    print(f"El topic {topic} no existe. Continuando con el siguiente.")
-            #else:
-            #    print(f"Error inesperado al intentar eliminar el topic {topic}: {e}")
 
     cargarPosiciones(args.kafka)
     hilo_servidor = threading.Thread(target=servidor_central, args=(args.puerto_central,args.kafka))
@@ -453,14 +429,9 @@ if __name__ == "__main__":
     idClientes = []
     pararT = []
 
-    #Variables para sincronizar mapa y pausar eventos.
-    #pause_event = threading.Event()
-    #pause_event.set()  # Inicialmente en modo "continuar"
-
     pausar = False
     creandoCliente = False
 
-    boton = False
     moviendoseBase = []
 
     connInit = sqlite3.connect('EasyCab.db')
@@ -474,7 +445,6 @@ if __name__ == "__main__":
     parser.add_argument('kafka', type=str)
     parser.add_argument('ip_central', type=str)
     parser.add_argument('puerto_central', type=int)
-    #parser.add_argument('bd', type=str)
 
     args = parser.parse_args()
 
