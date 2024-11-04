@@ -110,9 +110,8 @@ class Taxi(Entity):
 
 
     def finishService(self, newDst: Position = None):
-        serviceDst = None
+        serviceDst = Position(*self.dst.toTuple()) if self.dst is not None else None
         if newDst is not None:
-            serviceDst = Position(*self.dst.toTuple())
             self.dst = newDst
             self.logType = LogType.WAITING.value
         else:
@@ -130,13 +129,11 @@ class Taxi(Entity):
                     self.currentClient.logType = LogType.WAITING.value
 
             self.currentClient.currentTaxi = None
-            self.lock.release()
-
-            pygame.event.post(pygame.event.Event(Taxi.LocateClient, {"client" : self.currentClient}))
-
-            self.lock.acquire()
+            usedClient = self.currentClient
             self.currentClient = None
             self.lock.release()
+
+            pygame.event.post(pygame.event.Event(Taxi.LocateClient, {"client" : usedClient}))
 
 
 @dataclass(init = False)
