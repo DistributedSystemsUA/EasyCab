@@ -225,13 +225,11 @@ def moverTaxis(ip):
         for e in taxis:
             if e.currentClient is None and len(clientes_sin_taxi) > 0:
                 if creandoCliente == True:
-                    time.sleep(20)
+                    time.sleep(22)
                     creandoCliente = False
 
                 if not(e.id in moviendoseBase):
                     cliente = clientes_sin_taxi.pop(0)
-                    if cliente == None:
-                        print("Sou un none")
                     e.assignClient(cliente)
                     producer.send('escucha_mapa', (f"TaxiCogeCliente {e.id} {cliente.id}").encode('utf-8'))
                 
@@ -405,8 +403,12 @@ def botones(ip):
 
         elif datos[0] == ir_posicion:
             print("aqui2")
-            e.finishService(entities.Postion(datos[2],datos[3]))
-            boton = True
+            x, y = datos[1], datos[2]
+            print(x,y)
+            e.finishService(entities.Position(x,y))
+
+            producer.send('escucha_mapa', (f"GoD {e.id} {x} {y}").encode('utf-8'))
+            moviendoseBase.append(e.id)
         
 #-----------------------------------------------------------------------------------------------------------------
 def main():

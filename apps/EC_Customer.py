@@ -131,6 +131,10 @@ def carga_mapa():
             e = engine.gameMap.entities[int(datos[1])]
             e.finishService(entities.Position(1,1))
 
+        elif datos[0] == "GoD":
+            e = engine.gameMap.entities[int(datos[1])]
+            e.finishService(entities.Postion(datos[2],datos[3]))
+
 def escucha_mapa():
     ubicaciones = []
     taxis = []
