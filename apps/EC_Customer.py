@@ -73,6 +73,13 @@ def recibirMensajes():
                 if ind >= len(peticiones):  # Verifica después de incrementar
                     ind = 0  # Reinicia el índice si se sale del rango
                 enviarMensajes(ind)
+        elif mens == "Taxi_te_suelta":
+            peticiones.append(direccion)
+            en_curso = False
+            time.sleep(4)
+            if ind >= len(peticiones):  # Verifica después de incrementar
+                ind = 0  # Reinicia el índice si se sale del rango
+            enviarMensajes(ind)
 
 #----------------------------------------------------------------------------------------------------------
 def carga_mapa():
@@ -97,8 +104,8 @@ def carga_mapa():
 
         elif datos[0] == "Borrar_Cliente":
             if int(datos[1]) in engine.gameMap.entities:
-                #c = engine.gameMap.entities[int(datos[1])]
-                engine.gameMap.removeEntity(int(datos[1]))
+                cliente = engine.gameMap.entities.get(int(datos[1]))
+                engine.gameMap.removeEntity(cliente)
 
         elif datos[0] == "Crear_Cliente":
             if int(datos[5]) not in engine.gameMap.entities:
@@ -187,6 +194,6 @@ if __name__ == "__main__":
     peticiones = []
     ind = 0
     
-    #engine.start_passive(main,args.kafka)
-    engine.start(main,args.kafka)
+    engine.start_passive(main,args.kafka)
+    #engine.start(main,args.kafka)
     #main()

@@ -230,6 +230,8 @@ def moverTaxis(ip):
 
                 if not(e.id in moviendoseBase):
                     cliente = clientes_sin_taxi.pop(0)
+                    if cliente == None:
+                        print("Sou un none")
                     e.assignClient(cliente)
                     producer.send('escucha_mapa', (f"TaxiCogeCliente {e.id} {cliente.id}").encode('utf-8'))
                 
@@ -280,7 +282,16 @@ def moverTaxis(ip):
                 if e.id in moviendoseBase and e.logType == 0:
                     for m in moviendoseBase:
                         if m == e.id:
+                            print("Borro BB")
                             moviendoseBase.remove(m)
+                            for CT in asociacionClienteTaxi:
+                                if CT[0] == e.id:
+                                    cli = [c for c in idClientes if c[1] == CT[1]]
+                                    producer.send(f'clientes{cli[0][0]}', ("Taxi_te_suelta").encode('utf-8'))
+                                    for customer in idClientes:
+                                        if customer[0] == cli[0][0]:
+                                            customer[2] = 0
+                                    asociacionClienteTaxi.remove(CT)
             time.sleep(1)
 
 #-----------------------------------------------------------------------------------------------------------------
