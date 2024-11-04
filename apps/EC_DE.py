@@ -1,5 +1,6 @@
 from path_load import *
 
+import os
 import threading
 import json
 
@@ -145,6 +146,11 @@ def escucha_mapa():
                 engine.gameMap.addEntities(entities.Client(entities.Position(c["x_p"], c["y_p"]), entities.Position(int(c["x_d"]), int(c["y_d"]))))
         exit()
 #----------------------------------------------------------------------------------------------------------
+def cerrar_programa():
+    while True:
+        if engine.isRunning == False:
+            os._exit(0)
+#-----------------------------------------------------------------------------------------------------------------
 
 def main():
     validarTaxi(args.ip_central,args.puerto_central,args.id_taxi)
@@ -155,6 +161,8 @@ def main():
     Hilo_M.join()  # Espera a que Hilo_M termine
     Hilo_M2 = threading.Thread(target=carga_mapa)
     Hilo_M2.start()
+    hilo_cerrar = threading.Thread(target=cerrar_programa)
+    hilo_cerrar.start()
     sensor(args.kafka,args.id_taxi)
 
 

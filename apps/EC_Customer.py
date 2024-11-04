@@ -1,5 +1,6 @@
 from path_load import *
 
+import os
 from kafka import KafkaConsumer,KafkaProducer
 import time
 import threading
@@ -172,8 +173,17 @@ def escucha_mapa():
             # Verificar si la entidad ya existe
             if id_entidad not in engine.gameMap.entities:
                 engine.gameMap.addEntities(entities.Client(entities.Position(c["x_p"], c["y_p"]), entities.Position(int(c["x_d"]), int(c["y_d"]))))
+
+        todoslosCliente = [entity for entity in engine.gameMap.entities.values() if isinstance(entity, entities.Client)]
+        engine.pointedEntity = todoslosCliente[-1]
         exit()
-#----------------------------------------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------------------------------------------
+def cerrar_programa():
+    while True:
+        if engine.isRunning == False:
+            os._exit(0)
+#-----------------------------------------------------------------------------------------------------------------
 
 def main():
     cargarPeticiones()
@@ -185,6 +195,8 @@ def main():
     Hilo_Mapa.join()  # Espera a que Hilo_M termine
     Hilo_M2 = threading.Thread(target=carga_mapa)
     Hilo_M2.start()
+    hilo_cerrar = threading.Thread(target=cerrar_programa)
+    hilo_cerrar.start()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

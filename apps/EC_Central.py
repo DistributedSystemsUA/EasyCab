@@ -1,5 +1,6 @@
 from path_load import *
 
+import os
 import json
 import socket
 from kafka import KafkaConsumer,KafkaProducer
@@ -384,6 +385,11 @@ def botones(ip):
             moviendoseBase.append(e.id)
         
 #-----------------------------------------------------------------------------------------------------------------
+def cerrar_programa():
+    while True:
+        if engine.isRunning == False:
+            os._exit(0)
+#-----------------------------------------------------------------------------------------------------------------
 def main():
     # Configurar el cliente administrador de Kafka
     admin_client = AdminClient({
@@ -416,6 +422,8 @@ def main():
     hilo_pararT.start()
     hilo_pararB= threading.Thread(target=botones, args=(args.kafka,))
     hilo_pararB.start()
+    hilo_cerrar = threading.Thread(target=cerrar_programa)
+    hilo_cerrar.start()
     moverTaxis(args.kafka)
     
 if __name__ == "__main__":
