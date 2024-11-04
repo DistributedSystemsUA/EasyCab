@@ -133,7 +133,7 @@ def carga_mapa():
 
         elif datos[0] == "GoD":
             e = engine.gameMap.entities[int(datos[1])]
-            e.finishService(entities.Position(datos[2],datos[3]))
+            e.finishService(entities.Position(int(datos[2]),int(datos[3])))
 
 def escucha_mapa():
     ubicaciones = []
