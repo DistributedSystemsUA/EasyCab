@@ -96,8 +96,9 @@ def carga_mapa():
                 engine.gameMap.addEntities(entities.Taxi(int(datos[1]),entities.Position(1,1)))
 
         elif datos[0] == "Borrar_Cliente":
-            cliente = engine.gameMap.entities.get(int(datos[1]))
-            engine.gameMap.removeEntity(cliente)
+            if int(datos[1]) in engine.gameMap.entities:
+                #c = engine.gameMap.entities[int(datos[1])]
+                engine.gameMap.removeEntity(int(datos[1]))
 
         elif datos[0] == "Crear_Cliente":
             if int(datos[5]) not in engine.gameMap.entities:
@@ -118,6 +119,10 @@ def carga_mapa():
             e = engine.gameMap.entities[int(datos[1])]
             c = engine.gameMap.entities[int(datos[2])]
             e.assignClient(c)
+        
+        elif datos[0] == "BackB":
+            e = engine.gameMap.entities[int(datos[1])]
+            e.finishService(entities.Position(1,1))
 
 def escucha_mapa():
     ubicaciones = []
@@ -182,6 +187,6 @@ if __name__ == "__main__":
     peticiones = []
     ind = 0
     
-    engine.start_passive(main)
-    #engine.start(main)
+    #engine.start_passive(main,args.kafka)
+    engine.start(main,args.kafka)
     #main()

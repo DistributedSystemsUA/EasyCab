@@ -207,6 +207,9 @@ def moverTaxis(ip):
     global pausar
     global creandoCliente
 
+    global moviendoseBase
+    global boton
+
     producer = KafkaProducer(bootstrap_servers= ip)
 
     asociacionClienteTaxi = []
@@ -225,9 +228,11 @@ def moverTaxis(ip):
                     time.sleep(20)
                     creandoCliente = False
 
-                cliente = clientes_sin_taxi.pop(0)
-                e.assignClient(cliente)
-                producer.send('escucha_mapa', (f"TaxiCogeCliente {e.id} {cliente.id}").encode('utf-8'))
+                if not(e.id in moviendoseBase):
+                    cliente = clientes_sin_taxi.pop(0)
+                    e.assignClient(cliente)
+                    producer.send('escucha_mapa', (f"TaxiCogeCliente {e.id} {cliente.id}").encode('utf-8'))
+                
                 if e.currentClient is not None:
                     time.sleep(3)
                     for customer in idClientes:
@@ -261,7 +266,7 @@ def moverTaxis(ip):
                     producer.send('escucha_mapa', (f"Mover_taxi {e.id}").encode('utf-8'))
 
                 actualizar_estado_taxi(e.id, e.logType)
-                if e.logType == 0:
+                if e.logType == 0 and not(e.id in moviendoseBase):
                     for CT in asociacionClienteTaxi:
                         if CT[0] == e.id:
                             print("entro servicio completo")
@@ -271,6 +276,11 @@ def moverTaxis(ip):
                                 if customer[0] == cli[0][0]:
                                     customer[2] = 0
                             asociacionClienteTaxi.remove(CT)
+
+                if e.id in moviendoseBase and e.logType == 0:
+                    for m in moviendoseBase:
+                        if m == e.id:
+                            moviendoseBase.remove(m)
             time.sleep(1)
 
 #-----------------------------------------------------------------------------------------------------------------
@@ -336,6 +346,7 @@ def pasarMapa(ip):
 
 #-----------------------------------------------------------------------------------------------------------------
 def botones(ip):
+    global boton
 
     consumer = KafkaConsumer(
         'botones',
@@ -345,20 +356,46 @@ def botones(ip):
         group_id='botones'
     )
 
+    producer = KafkaProducer(bootstrap_servers= ip)
+
     parar_seguir = 0x01
     volver_base = 0x02
     ir_posicion = 0x03
 
     for message in consumer:
-        peticion= f"{message.value.decode('utf-8')}"
-        datos = peticion.strip().split()
+        global pararT
+
+        global moviendoseBase
+        global boton
+
+        data = message.value  # El mensaje en bytes
+        # Decodifica o procesa los bytes según lo necesites
+        datos = bytearray(data)
+        print(datos)
+        e = engine.gameMap.entities.get(engine.pointedEntity.id)
 
         if datos[0] == parar_seguir:
-            pass
+            print("aqui")
+            if e.logType == 1 or e.logType == 2:
+                pararT.append([-1,e.id])
+                producer.send('escucha_mapa', (f"Parar_taxi {e.id}").encode('utf-8'))
+                
+            if e.logType == 3:
+                for p in pararT:
+                    if p[1] == e.id:
+                        p[0] = 0
+
         elif datos[0] == volver_base:
-            pass
+            print("aqui1")
+            e.finishService(entities.Position(1,1))
+            producer.send('escucha_mapa', (f"BackB {e.id}").encode('utf-8'))
+
+            moviendoseBase.append(e.id)
+
         elif datos[0] == ir_posicion:
-            pass
+            print("aqui2")
+            e.finishService(entities.Postion(datos[2],datos[3]))
+            boton = True
         
 #-----------------------------------------------------------------------------------------------------------------
 def main():
@@ -395,6 +432,8 @@ def main():
     hilo_cliente.start()
     hilo_pararT= threading.Thread(target=paraTaxi, args=(args.kafka,))
     hilo_pararT.start()
+    hilo_pararB= threading.Thread(target=botones, args=(args.kafka,))
+    hilo_pararB.start()
     moverTaxis(args.kafka)
     
 if __name__ == "__main__":
@@ -407,6 +446,9 @@ if __name__ == "__main__":
 
     pausar = False
     creandoCliente = False
+
+    boton = False
+    moviendoseBase = []
 
     connInit = sqlite3.connect('EasyCab.db')
     cursorInit = connInit.cursor()
@@ -423,6 +465,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    engine.start(main)  # Pasar la función 'main' sin ejecutarla directamente
+    engine.start(main,args.kafka)  # Pasar la función 'main' sin ejecutarla directamente
 
     
