@@ -62,13 +62,7 @@ def start_passive(socket_app: Callable, ip = None):
     while True:
         event = pygame.event.wait()
 
-        if event.type == Taxi.MoveEvent:
-            gameMap.relocateEntity(event.taxi, event.oldPos)
-        elif event.type == pygame.VIDEORESIZE:
-            gameMap.resizeDisplay()
-            uiFont = pygame.font.Font(pygame.font.get_default_font(), size=int(gameMap.pxboxWidth * 0.6))
-        elif event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
-            _closeApplication()
+        _handlePassiveEvents(event)
 
         gameMap.display.fill("black")
         gameMap.render()
