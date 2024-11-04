@@ -110,6 +110,7 @@ class Taxi(Entity):
 
 
     def finishService(self, newDst: Position = None):
+        serviceDst = None
         if newDst is not None:
             serviceDst = Position(*self.dst.toTuple())
             self.dst = newDst
