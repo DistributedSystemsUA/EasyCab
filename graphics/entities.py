@@ -110,6 +110,7 @@ class Taxi(Entity):
 
 
     def finishService(self, newDst: Position = None):
+        serviceDst = Position(*self.dst.toTuple())
         if newDst is not None:
             self.dst = newDst
             self.logType = LogType.WAITING.value
@@ -119,8 +120,12 @@ class Taxi(Entity):
         if self.currentClient is not None:
             self.lock.acquire()
             self.currentClient.pos = Position(*self.pos.toTuple())
-            self.currentClient.dst = None
-            self.currentClient.logType = LogType.STANDBY.value if self.currentClient.pos == self.currentClient.dst else LogType.WAITING.value
+            if serviceDst == self.pos and self.currentClient.logType == LogType.BUSY.value:
+                self.currentClient.dst = None #Destination reached if taxi has arrived
+                self.currentClient.logType = LogType.STANDBY.value
+            else:
+                self.currentClient.logType = LogType.WAITING.value
+
             self.currentClient.currentTaxi = None
             self.lock.release()
 

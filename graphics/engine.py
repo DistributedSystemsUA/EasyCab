@@ -36,8 +36,8 @@ def start(socket_app: Callable, ip = None):
     while True:
         event = pygame.event.wait()
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == LEFT_CLICK:
-            _processClick(*pygame.mouse.get_pos())
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            _processClick(*pygame.mouse.get_pos(), event.button)
         _handlePassiveEvents(event)
 
         gameMap.display.fill("black")
@@ -140,30 +140,38 @@ def _initObjects(socket_app: Callable) -> pygame.Surface:
     return display
 
 
-def _processClick(x, y):
+def _processClick(x, y, button):
     global pointedEntity
     global entityControls
+    global broker_ip
+    global broker_topic
     BUTTON = 0; FUNC = 2
     loc = gameMap.getBoxLoc(x, y)
 
-    if loc is not None and (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
-        isTaxi = False
-        for e in l:
-            if isinstance(e, Taxi):
-                pointedEntity = e
-                isTaxi = True
-                break
+    if button == LEFT_CLICK:
+        if loc is not None and (l := gameMap.locateEntities(Position(loc[0], loc[1]))) is not None and l:
+            isTaxi = False
+            for e in l:
+                if isinstance(e, Taxi):
+                    pointedEntity = e
+                    isTaxi = True
+                    break
 
-        if not isTaxi:
-            pointedEntity = l[0]
-    elif pointedEntity is not None:
-        for control in entityControls:
-            if control[BUTTON].collidepoint(x, y):
-                control[FUNC]() # Do something with pointedEntity
-                return
-        pointedEntity = None
-        for i in range(len(entityControls)):
-            entityControls[i] = None
+            if not isTaxi:
+                pointedEntity = l[0]
+        elif pointedEntity is not None:
+            for control in entityControls:
+                if control is not None and control[BUTTON].collidepoint(x, y):
+                    control[FUNC]() # Do something with pointedEntity
+                    return
+            pointedEntity = None
+            for i in range(len(entityControls)):
+                entityControls[i] = None
+    elif button == RIGHT_CLICK and pointedEntity is not None:
+        #pointedEntity.finishService(Position(*loc))
+        producer = KafkaProducer(bootstrap_servers=broker_ip)
+        producer.send(broker_topic, bytearray([0x03, *gameMap.getBoxLoc(x,y)]))
+        producer.close()
 
 
 def _drawEntityPointer(display: pygame.Surface):
@@ -175,6 +183,10 @@ def _drawEntityPointer(display: pygame.Surface):
         return
     lightBlue = (0, 188, 227)
     _drawPointer(display, *usablePosition, lightBlue)
+    
+    # Show pointedEntity destination
+    if pointedEntity.dst is not None:
+        _drawPointer(display, *pointedEntity.dst.toTuple(), "red")
 
 
 def _drawPointer(display: pygame.Surface, x: int | float, y: int | float, color):
