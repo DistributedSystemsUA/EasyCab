@@ -187,6 +187,8 @@ def cerrar_programa():
 
 def main():
     cargarPeticiones()
+    hilo_cerrar = threading.Thread(target=cerrar_programa)
+    hilo_cerrar.start()
     Hilo_M = threading.Thread(target=recibirMensajes)
     enviarMensajes(0)
     Hilo_M.start()
@@ -195,8 +197,6 @@ def main():
     Hilo_Mapa.join()  # Espera a que Hilo_M termine
     Hilo_M2 = threading.Thread(target=carga_mapa)
     Hilo_M2.start()
-    hilo_cerrar = threading.Thread(target=cerrar_programa)
-    hilo_cerrar.start()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -105,7 +105,7 @@ def cargarClientes(ip):
         peticion= f"{message.value.decode('utf-8')}"
 
         datos = peticion.strip().split()
-        print(f"Creando el cliente {datos[1]}")
+        print(f"Creando el cliente {datos[0]}")
         if datos[1] == "Todas_las_peticiones_completadas":
             for i in idClientes:
                 if i[0] == datos[0]:
@@ -118,8 +118,6 @@ def cargarClientes(ip):
         if peticion != "" and datos[1] != "Todas_las_peticiones_completadas":
             cursor.execute("SELECT ID FROM Posicion WHERE ID = ?", (datos[1],))
             ids = cursor.fetchone()
-            cursor.execute("SELECT ID FROM Taxis WHERE estado = ?", (0,))
-            tx = cursor.fetchall()
             if ids[0] == datos[1]:
                 time.sleep(2)
                 cursor.execute("SELECT x,y FROM Posicion WHERE ID = ?", (datos[1],))
@@ -414,6 +412,8 @@ def main():
             pass
 
     cargarPosiciones(args.kafka)
+    hilo_cerrar = threading.Thread(target=cerrar_programa)
+    hilo_cerrar.start()
     hilo_servidor = threading.Thread(target=servidor_central, args=(args.puerto_central,args.kafka))
     hilo_servidor.start()
     hilo_cliente = threading.Thread(target=cargarClientes, args=(args.kafka,))
@@ -422,8 +422,6 @@ def main():
     hilo_pararT.start()
     hilo_pararB= threading.Thread(target=botones, args=(args.kafka,))
     hilo_pararB.start()
-    hilo_cerrar = threading.Thread(target=cerrar_programa)
-    hilo_cerrar.start()
     moverTaxis(args.kafka)
     
 if __name__ == "__main__":
