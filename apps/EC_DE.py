@@ -12,7 +12,6 @@ import argparse
 from kafka import KafkaProducer,KafkaConsumer
 
 HOST = 'localhost'
-#PORT = 9991
 
 BEL = 0x07
 
@@ -71,8 +70,6 @@ def carga_mapa():
         mens = message.value.decode('utf-8')
         datos = mens.strip().split()
 
-        print(datos[0],datos[1])
-
         if datos[0] == "Crear_Taxi":
             if int(datos[1]) not in engine.gameMap.entities:
                 engine.gameMap.addEntities(entities.Taxi(int(datos[1]),entities.Position(1,1)))
@@ -125,7 +122,7 @@ def escucha_mapa():
     )
     
     for message in consumer:
-        print("Entro")
+        print("CARGANDO MAPA...")
         orden = message.value  # Este es el diccionario deserializado
         ubicaciones = orden["ubicaciones"]  # Extraer la lista de diccionarios
         clientes = orden["clientes"]

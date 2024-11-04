@@ -5,7 +5,6 @@ from random import randint
 
 BEL = 0x07
 HOST = 'localhost' 
-#PORT = 9991
 
 def socket_client():
     # Crear socket
@@ -16,7 +15,9 @@ def socket_client():
         while True:
             time.sleep(randint(6,10))
             if randint(0,1) == 0:
-                client_socket.send(bytearray([BEL,randint(1,3)]))
+                tiempo = randint(1,3)
+                client_socket.send(bytearray([BEL,tiempo]))
+                print(f"Pausate: {tiempo} segundos")
 
     except KeyboardInterrupt:
         print("Cerrando conexión")

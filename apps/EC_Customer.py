@@ -46,14 +46,15 @@ def recibirMensajes():
     )
 
     for message in consumer:
-        print(f"Received message: {message.value.decode('utf-8')}")
         mens = message.value.decode('utf-8')
         if mens == "OK":
+            print("OK")
             if len(peticiones) != 0:
                 direccion = peticiones.pop(ind)
                 en_curso = True
 
         elif len(peticiones) > 0 and mens == "KO" and en_curso == False:
+            print("KO... Enviando siguiente peticion")
             time.sleep(4)
             ind += 1  # Incrementa el índice
             if ind >= len(peticiones):  # Verifica después de incrementar
@@ -69,11 +70,13 @@ def recibirMensajes():
                 enviarMensajes("Todas_las_peticiones_completadas")
                 exit()
             else:
+                print("Enviando siguiente peticion")
                 time.sleep(4)
                 if ind >= len(peticiones):  # Verifica después de incrementar
                     ind = 0  # Reinicia el índice si se sale del rango
                 enviarMensajes(ind)
         elif mens == "Taxi_te_suelta":
+            print("El cliente a sido expulsado")
             peticiones.append(direccion)
             en_curso = False
             time.sleep(4)
@@ -95,8 +98,6 @@ def carga_mapa():
         #time.sleep(4)
         mens = message.value.decode('utf-8')
         datos = mens.strip().split()
-
-        print(datos[0],datos[1])
 
         if datos[0] == "Crear_Taxi":
             if int(datos[1]) not in engine.gameMap.entities:
@@ -150,7 +151,7 @@ def escucha_mapa():
     )
     
     for message in consumer:
-        print("Entro")
+        print("CARGANDO MAPA...")
         orden = message.value  # Este es el diccionario deserializado
         ubicaciones = orden["ubicaciones"]  # Extraer la lista de diccionarios
         clientes = orden["clientes"]

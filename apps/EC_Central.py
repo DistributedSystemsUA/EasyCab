@@ -104,7 +104,7 @@ def cargarClientes(ip):
         peticion= f"{message.value.decode('utf-8')}"
 
         datos = peticion.strip().split()
-        print(datos[1])
+        print(f"Creando el cliente {datos[1]}")
         if datos[1] == "Todas_las_peticiones_completadas":
             for i in idClientes:
                 if i[0] == datos[0]:
@@ -252,7 +252,7 @@ def moverTaxis(ip):
                 if e.logType == 0 and not(e.id in moviendoseBase):
                     for CT in asociacionClienteTaxi:
                         if CT[0] == e.id:
-                            print("entro servicio completo")
+                            print(f"Taxi {e.id} ha llegado a su destino")
                             cli = [c for c in idClientes if c[1] == CT[1]]
                             producer.send(f'clientes{cli[0][0]}', ("Servicio Completado").encode('utf-8'))
                             for customer in idClientes:
@@ -263,7 +263,6 @@ def moverTaxis(ip):
                 if e.id in moviendoseBase and e.logType == 0:
                     for m in moviendoseBase:
                         if m == e.id:
-                            print("Borro BB")
                             moviendoseBase.remove(m)
                             for CT in asociacionClienteTaxi:
                                 if CT[0] == e.id:
@@ -279,7 +278,7 @@ def moverTaxis(ip):
 def pasarMapa(ip):
     global pausar
 
-    print("paso de aqui")
+    print("CARGANDO MAPA")
     
     producer = KafkaProducer(bootstrap_servers=ip, value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
@@ -328,7 +327,6 @@ def pasarMapa(ip):
         "clientes":clientes
     }
 
-    print("Envio")
     producer.send('enviar_mapa', orden)
     producer.flush()
     producer.close()
@@ -360,11 +358,9 @@ def botones(ip):
         data = message.value  # El mensaje en bytes
         # Decodifica o procesa los bytes según lo necesites
         datos = bytearray(data)
-        print(datos)
         e = engine.gameMap.entities.get(engine.pointedEntity.id)
 
         if datos[0] == parar_seguir:
-            print("aqui")
             if e.logType == 1 or e.logType == 2:
                 pararT.append([-1,e.id])
                 producer.send('escucha_mapa', (f"Parar_taxi {e.id}").encode('utf-8'))
@@ -375,16 +371,13 @@ def botones(ip):
                         p[0] = 0
 
         elif datos[0] == volver_base:
-            print("aqui1")
             e.finishService(entities.Position(1,1))
             producer.send('escucha_mapa', (f"BackB {e.id}").encode('utf-8'))
 
             moviendoseBase.append(e.id)
 
         elif datos[0] == ir_posicion:
-            print("aqui2")
             x, y = datos[1], datos[2]
-            print(x,y)
             e.finishService(entities.Position(x,y))
 
             producer.send('escucha_mapa', (f"GoD {e.id} {x} {y}").encode('utf-8'))
