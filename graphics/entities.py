@@ -119,12 +119,14 @@ class Taxi(Entity):
 
         if self.currentClient is not None:
             self.lock.acquire()
-            if serviceDst == self.pos and self.currentClient.logType == LogType.BUSY.value:
-                self.currentClient.dst = None #Destination reached if taxi has arrived
-                self.currentClient.logType = LogType.STANDBY.value
+            if self.currentClient.logType == LogType.BUSY.value:
                 self.currentClient.pos = Position(*self.pos.toTuple())
-            else:
-                self.currentClient.logType = LogType.WAITING.value
+
+                if serviceDst == self.pos:
+                    self.currentClient.dst = None #Destination reached if taxi has arrived
+                    self.currentClient.logType = LogType.STANDBY.value
+                else:
+                    self.currentClient.logType = LogType.WAITING.value
 
             self.currentClient.currentTaxi = None
             self.lock.release()
