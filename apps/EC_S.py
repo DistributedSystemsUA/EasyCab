@@ -13,6 +13,16 @@ def socket_client():
     print("Conectado con taxi")
     try:
         while True:
+            # Verificar si el servidor ha cerrado la conexión
+            try:
+                data = client_socket.recv(1, socket.MSG_PEEK)
+                if len(data) == 0:
+                    print("El servidor ha cerrado la conexión. Cerrando el cliente.")
+                    break
+            except BlockingIOError:
+                # La operación no está lista aún, continuar
+                pass
+            
             time.sleep(randint(6,10))
             if randint(0,1) == 0:
                 tiempo = randint(1,3)
@@ -23,6 +33,10 @@ def socket_client():
         print("Cerrando conexión")
         client_socket.close()
 
+    except Exception as e:
+        print(f"Cerrando conexión por {e}")
+        client_socket.close()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('puerto', type=int)
@@ -30,4 +44,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     socket_client()
+
 

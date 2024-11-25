@@ -15,6 +15,72 @@ from random import randint
 from confluent_kafka.admin import AdminClient
 
 #------------------------------------------------------------------------------------------------------------
+def manejar_taxi(conexion, direccion, id_taxi, producer, ip,kafka):
+    global pasandoM
+    try:
+        print(f"Taxi {id_taxi} conectado desde {direccion}")
+
+        # Añadir el taxi a la base de datos
+        conn = sqlite3.connect('EasyCab.db')
+        cursor = conn.cursor()
+        cursor.execute('INSERT INTO Taxis (ID, estado) VALUES (?, ?)', (int(id_taxi), 0))
+        conn.commit()
+        conn.close()
+
+        # Enviar confirmación de autenticación al taxi
+        conexion.send("OK".encode('utf-8'))
+
+        # Añadir el taxi al mapa
+        engine.gameMap.addEntities(entities.Taxi(int(id_taxi), entities.Position(1, 1)))
+        producer.send('escucha_mapa', (f"Crear_Taxi {id_taxi}").encode('utf-8'))
+        while pasandoM == True:
+            pass
+        pasarMapa(kafka,id_taxi,"Taxi")
+        
+        # Mantener la conexión abierta y detectar desconexión
+        while True:
+            data = conexion.recv(1024)
+            if not data:  # Si no se recibe data, el taxi se ha desconectado
+                print(f"Taxi {id_taxi} se ha desconectado.")
+                
+                # Actualizar el estado del taxi en la base de datos
+                conn = sqlite3.connect('EasyCab.db')
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM Taxis WHERE ID = ?', (id_taxi,))
+                conn.commit()
+                conn.close()
+                
+                # Informar la desconexión en el mapa
+                taxi = engine.gameMap.entities.get(id_taxi)
+                engine.gameMap.removeEntity(taxi)
+                producer.send('escucha_mapa', (f"Eliminar_Taxi {id_taxi}").encode('utf-8'))
+                break
+    except Exception as e:
+        print(f"Error con el taxi {id_taxi}: {e}")
+    finally:
+        conexion.close()
+
+def validar_taxis(puerto_central,ip,kafka):
+    #ip, puerto = ip.split(':')
+    producer = KafkaProducer(bootstrap_servers=kafka)
+    servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    #servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    servidor.bind((ip, puerto_central))
+    servidor.listen(5)
+    print(f"EC_Central escuchando en el puerto {puerto_central}...")
+
+    while True:
+        conexion, direccion = servidor.accept()
+        print(f"Conexión establecida con {direccion}")
+
+        # Recibir el ID del taxi que se conecta
+        id_taxi = conexion.recv(1024).decode('utf-8')
+        print(f"Recibido ID de taxi: {id_taxi}")
+
+        # Iniciar un hilo para manejar la conexión del taxi
+        hilo_taxi = threading.Thread(target=manejar_taxi, args=(conexion, direccion, int(id_taxi), producer, ip,kafka))
+        hilo_taxi.start()
+#------------------------------------------------------------------------------------------------------------
 def servidor_central(puerto_central,ip):
     global pausar
     producer = KafkaProducer(bootstrap_servers= ip)
@@ -84,6 +150,8 @@ def cargarClientes(ip):
     global pausar
     global creandoCliente
 
+    global salidos
+
     conn = sqlite3.connect('EasyCab.db')
     cursor = conn.cursor()
 
@@ -105,7 +173,11 @@ def cargarClientes(ip):
         peticion= f"{message.value.decode('utf-8')}"
 
         datos = peticion.strip().split()
-        print(f"Creando el cliente {datos[0]}")
+
+        if datos[1] == "salgo":
+            print(f"Cliente {datos[0]} se ha desconectado")
+            salidos.append(datos[0])
+
         if datos[1] == "Todas_las_peticiones_completadas":
             for i in idClientes:
                 if i[0] == datos[0]:
@@ -115,7 +187,7 @@ def cargarClientes(ip):
                     producer.send('escucha_mapa', (f"Borrar_Cliente {i[1]}").encode('utf-8'))
                     idClientes.remove(i)
 
-        if peticion != "" and datos[1] != "Todas_las_peticiones_completadas":
+        if peticion != "" and datos[1] != "Todas_las_peticiones_completadas" and datos[1] != "salgo":
             cursor.execute("SELECT ID FROM Posicion WHERE ID = ?", (datos[1],))
             ids = cursor.fetchone()
             if ids[0] == datos[1]:
@@ -126,14 +198,17 @@ def cargarClientes(ip):
                     posicion_x = randint(1,20)
                     posicion_y = randint(1,20)
 
+                    print(f"Creando el cliente {datos[0]}")
                     creandoCliente = True
                     engine.gameMap.addEntities(entities.Client(entities.Position(posicion_x, posicion_y), entities.Position(int(data[0]), int(data[1]))))
                     time.sleep(3)
                     todoslosCliente = [entity for entity in engine.gameMap.entities.values() if isinstance(entity, entities.Client)]
                     time.sleep(2)
                     idClientes.append([datos[0],todoslosCliente[-1].id,0])
-
-                    pasarMapa(ip)
+                    
+                    while pasandoM == True:
+                        pass
+                    pasarMapa(ip,int(datos[0]),"cliente")
                     producer.send('escucha_mapa', (f"Crear_Cliente {posicion_x} {posicion_y} {data[0]} {data[1]} {todoslosCliente[-1].id}").encode('utf-8'))
 
                 else:
@@ -177,8 +252,14 @@ def paraTaxi(ip):
         peticion= f"{message.value.decode('utf-8')}"
         datos = peticion.strip().split()
         insertar = True
+
+        if int(datos[0]) == -1:
+            for t in pararT:
+                if t[1] == int(datos[1]):
+                    pararT.remove(t)
+
         for t in pararT:
-            if t[1] == datos[1]:
+            if t[1] == int(datos[1]):
                 insertar = False
 
         if insertar == True:
@@ -191,6 +272,7 @@ def moverTaxis(ip):
     global creandoCliente
 
     global moviendoseBase
+    global salidos
 
     producer = KafkaProducer(bootstrap_servers= ip)
 
@@ -207,7 +289,7 @@ def moverTaxis(ip):
         for e in taxis:
             if e.currentClient is None and len(clientes_sin_taxi) > 0:
                 if creandoCliente == True:
-                    time.sleep(22)
+                    time.sleep(28)
                     creandoCliente = False
 
                 if not(e.id in moviendoseBase):
@@ -244,6 +326,9 @@ def moverTaxis(ip):
                         if t[1] == e.id:
                             t[0] -= 1
                 else:
+                    if e.currentClient is None and not(e.id in moviendoseBase):
+                        e.finishService(entities.Position(1,1))
+                        producer.send('escucha_mapa', (f"a_base {e.id}").encode('utf-8'))
                     e.move()
                     producer.send('escucha_mapa', (f"Mover_taxi {e.id}").encode('utf-8'))
 
@@ -258,6 +343,11 @@ def moverTaxis(ip):
                                 if customer[0] == cli[0][0]:
                                     customer[2] = 0
                             asociacionClienteTaxi.remove(CT)
+                            for s in salidos:
+                                for c in idClientes:
+                                    if s == c[0]:
+                                        producer.send('clientes', f"{s} Todas_las_peticiones_completadas".encode('utf-8'))
+                                        salidos.remove(s)
 
                 if e.id in moviendoseBase and e.logType == 0:
                     for m in moviendoseBase:
@@ -271,19 +361,28 @@ def moverTaxis(ip):
                                         if customer[0] == cli[0][0]:
                                             customer[2] = 0
                                     asociacionClienteTaxi.remove(CT)
+                                    for s in salidos:
+                                        for c in idClientes:
+                                            if s == c[0]:
+                                                producer.send('clientes', f"{s} Todas_las_peticiones_completadas".encode('utf-8'))
+                                                salidos.remove(s)
             time.sleep(1)
 
 #-----------------------------------------------------------------------------------------------------------------
-def pasarMapa(ip):
+def pasarMapa(ip,id,tipo):
     global pausar
+    global pasandoM
 
-    print("CARGANDO MAPA")
+    print(f"CARGANDO MAPA PARA {tipo} CON ID: {id}")
+    pasandoM = True
     
     producer = KafkaProducer(bootstrap_servers=ip, value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
     ubicaciones = []
     taxis = []
     clientes = []
+
+    time.sleep(3)
 
     todas_las_ubicaciones = engine.gameMap.locations.values()
     for ubi in todas_las_ubicaciones:
@@ -294,7 +393,7 @@ def pasarMapa(ip):
             taxis.append({"id": entidad.id, "x": entidad.pos.x, "y": entidad.pos.y})#,"estado":entidad.logType})
         elif isinstance(entidad, entities.Client):
             # Verificar si 'dst' no es None antes de acceder a 'dst.x' y 'dst.y'
-            if entidad.dst is not None:
+            if entidad.dst is not None and entidad.pos is not None:
                 clientes.append({
                     "id": entidad.id,
                     "x_p": entidad.pos.x,
@@ -320,17 +419,26 @@ def pasarMapa(ip):
                 })
 
 
+    pasarid = 0
+    if tipo == "cliente":
+        pasarid = id + 120
+    else:
+        pasarid = id
+
     orden = {
+        "id": pasarid,
         "ubicaciones": ubicaciones,
         "taxis":taxis,
         "clientes":clientes
     }
 
+    time.sleep(3)
     producer.send('enviar_mapa', orden)
     producer.flush()
     producer.close()
 
     pausar = True
+    pasandoM = False
     time.sleep(15)
 
 #-----------------------------------------------------------------------------------------------------------------
@@ -414,8 +522,10 @@ def main():
     cargarPosiciones(args.kafka)
     hilo_cerrar = threading.Thread(target=cerrar_programa)
     hilo_cerrar.start()
-    hilo_servidor = threading.Thread(target=servidor_central, args=(args.puerto_central,args.kafka))
+    hilo_servidor = threading.Thread(target=validar_taxis, args=(args.puerto_central,args.ip_central,args.kafka))
     hilo_servidor.start()
+    #hilo_servidor = threading.Thread(target=servidor_central, args=(args.puerto_central,args.kafka))
+    #hilo_servidor.start()
     hilo_cliente = threading.Thread(target=cargarClientes, args=(args.kafka,))
     hilo_cliente.start()
     hilo_pararT= threading.Thread(target=paraTaxi, args=(args.kafka,))
@@ -430,8 +540,10 @@ if __name__ == "__main__":
 
     pausar = False
     creandoCliente = False
+    pasandoM = False
 
     moviendoseBase = []
+    salidos = []
 
     connInit = sqlite3.connect('EasyCab.db')
     cursorInit = connInit.cursor()

@@ -34,6 +34,7 @@ class Taxi(Entity):
     JustRender: ClassVar[int] = pygame.event.custom_type()
 
     currentClient: Client = None
+    estado_anterior = None
     lock = threading.Lock()
 
     def __init__(self, own_id: int, origin: Position, dst: Position = None):
@@ -50,7 +51,8 @@ class Taxi(Entity):
     def move(self):
         if self.dst is None: return
         if self.logType == LogType.INCONVENIENCE.value:
-            self.logType = LogType.BUSY.value
+            #self.logType = LogType.BUSY.value
+            self.logType = self.estado_anterior
 
         self.lock.acquire()
         oldPosition = self.pos # old pos immutable = mem security
@@ -71,6 +73,8 @@ class Taxi(Entity):
 
     def stop(self):
         self.lock.acquire()
+        if self.logType != LogType.INCONVENIENCE.value:
+            self.estado_anterior = self.logType
         self.logType = LogType.INCONVENIENCE.value
         pygame.event.post(pygame.event.Event(Taxi.JustRender))
         self.lock.release()

@@ -7,6 +7,7 @@ import threading
 import argparse
 import json
 
+import sys
 import entities
 import engine
 
@@ -34,6 +35,7 @@ def enviarMensajes(ind):
 def recibirMensajes():
     global peticiones
     global ind
+    global principio
 
     en_curso = False
     direccion = ""
@@ -47,6 +49,7 @@ def recibirMensajes():
     )
 
     for message in consumer:
+        principio = False
         mens = message.value.decode('utf-8')
         if mens == "OK":
             print("OK")
@@ -69,7 +72,7 @@ def recibirMensajes():
             if len(peticiones) == 0:
                 print("Todas las peticiones completadas")
                 enviarMensajes("Todas_las_peticiones_completadas")
-                exit()
+                os._exit(0)
             else:
                 print("Enviando siguiente peticion")
                 time.sleep(4)
@@ -136,6 +139,14 @@ def carga_mapa():
         elif datos[0] == "GoD":
             e = engine.gameMap.entities[int(datos[1])]
             e.finishService(entities.Position(int(datos[2]),int(datos[3])))
+        
+        elif datos[0] == "Eliminar_Taxi":
+            e = engine.gameMap.entities[int(datos[1])]
+            engine.gameMap.removeEntity(e)
+
+        elif datos[0] == "a_base":
+            e = engine.gameMap.entities[int(datos[1])]
+            e.finishService(entities.Position(1,1))
 
 def escucha_mapa():
     ubicaciones = []
@@ -152,36 +163,50 @@ def escucha_mapa():
     )
     
     for message in consumer:
-        print("CARGANDO MAPA...")
         orden = message.value  # Este es el diccionario deserializado
+        identidad = orden["id"]
         ubicaciones = orden["ubicaciones"]  # Extraer la lista de diccionarios
         clientes = orden["clientes"]
         taxis = orden["taxis"]
 
+        if  identidad == int(args.id) +120:
+            print("CARGANDO MAPA...")
+            for u in ubicaciones:
+                engine.gameMap.addLocations(entities.Location(ID=u["id"], pos=entities.Position(int(u["x"]), int(u["y"]))))
 
-        for u in ubicaciones:
-            engine.gameMap.addLocations(entities.Location(ID=u["id"], pos=entities.Position(int(u["x"]), int(u["y"]))))
+            for u in taxis:
+                id_entidad = int(u["id"])
+                # Verificar si la entidad ya existe
+                if id_entidad not in engine.gameMap.entities:
+                    engine.gameMap.addEntities(entities.Taxi(int(u["id"]),entities.Position(int(u["x"]),int(u["y"]))))
 
-        for u in taxis:
-            id_entidad = int(u["id"])
-            # Verificar si la entidad ya existe
-            if id_entidad not in engine.gameMap.entities:
-                engine.gameMap.addEntities(entities.Taxi(int(u["id"]),entities.Position(int(u["x"]),int(u["y"]))))
+            for c in clientes:
+                id_entidad = c["id"]
+                # Verificar si la entidad ya existe
+                if id_entidad not in engine.gameMap.entities:
+                    engine.gameMap.addEntities(entities.Client(entities.Position(c["x_p"], c["y_p"]), entities.Position(int(c["x_d"]), int(c["y_d"]))))
 
-        for c in clientes:
-            id_entidad = c["id"]
-            # Verificar si la entidad ya existe
-            if id_entidad not in engine.gameMap.entities:
-                engine.gameMap.addEntities(entities.Client(entities.Position(c["x_p"], c["y_p"]), entities.Position(int(c["x_d"]), int(c["y_d"]))))
-
-        todoslosCliente = [entity for entity in engine.gameMap.entities.values() if isinstance(entity, entities.Client)]
-        engine.pointedEntity = todoslosCliente[-1]
-        exit()
+            time.sleep(3)
+            todoslosCliente = [entity for entity in engine.gameMap.entities.values() if isinstance(entity, entities.Client)]
+            engine.pointedEntity = todoslosCliente[-1]
+            sys.exit()
+#-----------------------------------------------------------------------------------------------------------------
+def mostrarte():
+    global principio
+    while True:
+        if principio == True:
+            producer = KafkaProducer(bootstrap_servers= ip)
+            producer.send('clientes', peticiones[ind].encode('utf-8'))
+        else:
+            sys.exit()
 
 #-----------------------------------------------------------------------------------------------------------------
 def cerrar_programa():
+    producer = KafkaProducer(bootstrap_servers= args.kafka)
     while True:
         if engine.isRunning == False:
+            producer.send('clientes', f"{args.id} salgo".encode('utf-8'))
+            time.sleep(3)
             os._exit(0)
 #-----------------------------------------------------------------------------------------------------------------
 
@@ -189,6 +214,8 @@ def main():
     cargarPeticiones()
     hilo_cerrar = threading.Thread(target=cerrar_programa)
     hilo_cerrar.start()
+    #hilo_principio= threading.Thread(target=mostrarte)
+    #hilo_principio.start()
     Hilo_M = threading.Thread(target=recibirMensajes)
     enviarMensajes(0)
     Hilo_M.start()
@@ -210,5 +237,6 @@ if __name__ == "__main__":
 
     peticiones = []
     ind = 0
+    principio = True
     
     engine.start_passive(main,args.kafka)
