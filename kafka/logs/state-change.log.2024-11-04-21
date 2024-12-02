@@ -1,0 +1,1 @@
+[2024-11-04 21:35:09,452] INFO [Controller id=0 epoch=40] Sending UpdateMetadata request to brokers Set() for 0 partitions (state.change.logger)
