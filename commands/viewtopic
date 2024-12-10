@@ -1,0 +1,3 @@
+#!/bin/bash
+[ -z "$1" ] && echo "Must provide topic name" && return
+../kafka/bin/kafka-topics.sh --describe --topic $1 --bootstrap-server localhost:9092
