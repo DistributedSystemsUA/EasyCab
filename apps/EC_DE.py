@@ -4,6 +4,7 @@ import sys
 import os
 import threading
 import json
+import subprocess
 
 import engine
 import entities
@@ -14,8 +15,19 @@ import argparse
 from kafka import KafkaProducer,KafkaConsumer
 
 HOST = 'localhost'
-
 BEL = 0x07
+TOPIC = 'map-events'
+
+IS_TAXI_ID_OK = 0x01
+TAXI_ID_OK = 0x06
+TAXI_ID_NOT_OK = 0x15
+
+STATUS_INCONVENIENCE = 0x0b
+
+service_enabled = True
+current_entity: Taxi = None
+central_communicator: KafkaProducer = None
+
 
 def sensor(kafka,id_taxi):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -228,7 +240,8 @@ def cerrar_programa():
             os._exit(0)
 #-----------------------------------------------------------------------------------------------------------------
 
-def main():
+
+def not_main():
     hilo_cerrar = threading.Thread(target=cerrar_programa)
     hilo_cerrar.start()
     Hilo_Sensor = threading.Thread(target=sensor2, args=(args.kafka,args.id_taxi))
@@ -250,17 +263,122 @@ def main():
     #sensor(args.kafka,args.id_taxi)
 
 
-if __name__ == "__main__":
-     # Argumentos del programa
+def start_service():
+    pass
+
+
+def _remote_validate(taxi_id: int) -> bool:
+    try:
+        skvalidator = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        skvalidator.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Permitir reutilizar el puerto
+        skvalidator.connect((args.ip_central, args.puerto_central))
+        skvalidator.send(bytes([IS_TAXI_ID_OK, selected_id]))
+        response = skvalidator.recv(1)
+        if response[0] == TAXI_ID_NOT_OK :
+            selected_id = 0 # Will repeat id question
+            print(f"The id {selected_id} is incorrect or has a collision")
+            return False
+    except Exception as e:
+        print(f"The taxi could not connect to the server: {e}")
+        return False
+    finally:
+        skvalidator.close()
+
+    return False
+
+
+def _obtain_valid_id() -> int:
+    while selected_id <= 0 or selected_id > 99:
+        try:
+            selected_id = int(input("Introduzca su id de taxi: "))
+        except:
+            print("Que siii, que pongas un numero")
+            selected_id = 0
+
+
+def validate_taxi() -> bool:
+    global current_entity
+    if args.taxi_id is None:
+        args.taxi_id = _obtain_valid_id()
+
+    while not _remote_validate(args.taxi_id):
+        args.taxi_id = _obtain_valid_id()
+
+    current_entity = Taxi(args.taxi_id, Position(1,1))
+    engine.gameMap.addEntities(current_entity)
+    engine.pointedEntity = current_entity
+    return True
+
+
+def sensor(client_sensors: socket.socket):
+    global central_communicator
+    global service_enabled
+    sensor_lock = threading.Lock()
+    try:
+        while True:
+            data = client_sensors.recv(2)
+            service_enabled = False
+
+            sensor_lock.acquire()
+            central_communicator.send(TOPIC, bytes([STATUS_INCONVENIENCE, current_entity.id]))
+            sensor_lock.release()
+            
+            if not data:
+                break # sensor disconnected
+            if data[0] == BEL and data[1] > 0:
+                time.sleep(int(data[1]))
+
+            service_enabled = True
+    except Exception as e:
+        print(f"{e}")
+    finally:
+        print(f"WARNING: Los sensores han sido desconectados")
+        client_sensors.close()
+
+
+def init_sensor():
+    global service_enabled
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Permitir reutilizar el puerto
+    srv.bind((HOST, args.puerto))
+    subprocess.Popen(["$TERM", "-e", "python3", "EC_S.py", args.puerto]) # Sensores activados
+
+    print(f"Buscando sensores")
+    srv.listen()
+    client_sensor, addr = server_socket.accept()
+    print(f"Sensores conectados en {addr}")
+
+    service_enabled = True
+    receiver = threading.Thread(target=sensor, args=(client_sensor))
+    receiver.start()
+
+
+# Fills the namespace variable "args" with the parsed arguments
+def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('ip_central', type=str)
-    parser.add_argument('puerto_central', type=int)
-    parser.add_argument('id_taxi', type=int)
-    parser.add_argument('kafka', type=str)
-    parser.add_argument('puerto', type=int)
+    parser.add_argument('ip_central', type=str, required=True)
+    parser.add_argument('puerto_central', type=int, required=True)
+    parser.add_argument('kafka', type=str, required=True)
+    parser.add_argument('puerto', type=int, required=True)
+    parser.add_argument('taxi_id', type=int, required=False)
 
-    args = parser.parse_args()
+    args = argparse.parse_args()
 
-    sensorA = False
-    
-    engine.start_passive(main,args.kafka)
+
+def main():
+    global central_communicator
+    central_communicator = KafkaProducer(
+        bootstrap_servers=[args.kafka],
+        acks=1,
+        linger_ms=1,
+        batch_size=100)
+
+    parse_args()
+    validate_taxi()
+    init_sensor()
+    start_service()
+    # Conecta con central
+
+
+if __name__ == "__main__":
+    engine.start_passive(main, args.kafka)
