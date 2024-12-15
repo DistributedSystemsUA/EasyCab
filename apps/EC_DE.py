@@ -241,28 +241,6 @@ def cerrar_programa():
 #-----------------------------------------------------------------------------------------------------------------
 
 
-def not_main():
-    hilo_cerrar = threading.Thread(target=cerrar_programa)
-    hilo_cerrar.start()
-    Hilo_Sensor = threading.Thread(target=sensor2, args=(args.kafka,args.id_taxi))
-    Hilo_Sensor.start()
-
-    while sensorA == False:
-        pass
-
-    Hilo_TX = threading.Thread(target=validarTaxi2, args=(args.ip_central,args.puerto_central,args.id_taxi))
-    Hilo_TX.start()
-    #validarTaxi(args.ip_central,args.puerto_central,args.id_taxi)
-    engine.gameMap.addEntities(entities.Taxi(args.id_taxi,entities.Position(1,1)))
-    engine.pointedEntity = engine.gameMap.entities[args.id_taxi]
-    Hilo_M = threading.Thread(target=escucha_mapa)
-    Hilo_M.start()
-    Hilo_M.join()  # Espera a que Hilo_M termine
-    Hilo_M2 = threading.Thread(target=carga_mapa)
-    Hilo_M2.start()
-    #sensor(args.kafka,args.id_taxi)
-
-
 def start_service():
     pass
 
@@ -275,8 +253,6 @@ def _remote_validate(taxi_id: int) -> bool:
         skvalidator.send(bytes([IS_TAXI_ID_OK, selected_id]))
         response = skvalidator.recv(1)
         if response[0] == TAXI_ID_NOT_OK :
-            selected_id = 0 # Will repeat id question
-            print(f"The id {selected_id} is incorrect or has a collision")
             return False
     except Exception as e:
         print(f"The taxi could not connect to the server: {e}")
