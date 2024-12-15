@@ -241,10 +241,49 @@ def cerrar_programa():
 #-----------------------------------------------------------------------------------------------------------------
 
 
+def _fast_consumer(topic: str) -> KafkaConsumer:
+    global args
+    return KafkaConsumer(INIT_TOPIC, bootstrap_servers=args.kafka, auto_offset_reset='earliest')
+
+
+def _fast_producer(topic: str) -> KafkaProducer:
+    global args
+    return KafkaProducer(bootstrap_servers=args.kafka, acks=1, linger_ms=1, batch_size=100)
+
+
+def _reloc_entity(msg: bytes, e_type: type):
+    if (e := engine.gameMap.entities.get(msg[1])) is not None and (e.pos.x != msg[2] or e.pos.y != msg[3]):
+        e.pos = 
+        engine.gameMap.relocateEntity(
+        engine.gameMap.relocateEntity(e, oldPos)
+
+
+def _new_taxi(msg):
+    if engine.gameMap.entities.get(msg[1]) is not None:
+        engine.gameMap.addEntities(Taxi(msg[1], Position(msg[2], msg[3])))
+
+
+def _new_client(msg):
+    if engine.gameMap.entities.get(msg[2]) is None:
+        engine.gameMap.addEntities(Client(origin[
+
+
+def _update_map():
+    map_events = _fast_consumer(TOPIC)
+    INSTRUCTIONS = [ #TODO: make functions
+
+    for msg in map_events:
+        #TODO: array of tuples with anonymous functions
+
+
 def start_service():
-    pass
+    global args
+    global service_enabled
+    
+    map_updates = _fast_consumer(TOPIC)
 
 
+#TODO: change by API code
 def _remote_validate(taxi_id: int) -> bool:
     try:
         skvalidator = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -256,11 +295,11 @@ def _remote_validate(taxi_id: int) -> bool:
             return False
     except Exception as e:
         print(f"The taxi could not connect to the server: {e}")
-        return False
+        exit(1)
     finally:
         skvalidator.close()
 
-    return False
+    return True
 
 
 def _obtain_valid_id() -> int:
@@ -272,7 +311,8 @@ def _obtain_valid_id() -> int:
             selected_id = 0
 
 
-def validate_taxi() -> bool:
+def validate_taxi():
+    global args
     global current_entity
     if args.taxi_id is None:
         args.taxi_id = _obtain_valid_id()
@@ -283,7 +323,6 @@ def validate_taxi() -> bool:
     current_entity = Taxi(args.taxi_id, Position(1,1))
     engine.gameMap.addEntities(current_entity)
     engine.pointedEntity = current_entity
-    return True
 
 
 def sensor(client_sensors: socket.socket):
@@ -314,6 +353,7 @@ def sensor(client_sensors: socket.socket):
 
 def init_sensor():
     global service_enabled
+    global args
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Permitir reutilizar el puerto
     srv.bind((HOST, args.puerto))
@@ -331,6 +371,7 @@ def init_sensor():
 
 # Fills the namespace variable "args" with the parsed arguments
 def parse_args():
+    global args
     parser = argparse.ArgumentParser()
     parser.add_argument('ip_central', type=str, required=True)
     parser.add_argument('puerto_central', type=int, required=True)
@@ -342,14 +383,11 @@ def parse_args():
 
 
 def main():
+    global args
     global central_communicator
-    central_communicator = KafkaProducer(
-        bootstrap_servers=[args.kafka],
-        acks=1,
-        linger_ms=1,
-        batch_size=100)
-
     parse_args()
+
+    central_communicator = _fast_producer(TOPIC)
     validate_taxi()
     init_sensor()
     start_service()

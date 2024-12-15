@@ -9,4 +9,5 @@ EVENTS IN TOPIC: map-events
     0x08 -> taxi moves (id, current_client=0, x, y)
     0x09 -> taxi is redirected by central (id, x, y)
     0x0a -> client is relocated (id, x, y)
-    0x0b -> taxi sensors are disconnected (id)
+    0x0b -> taxi sensors are disconnected (id) "if taxi moves again, means sensors are connected again"
+    0x0c -> sensors stop by inconvenience (id, time_sec)
