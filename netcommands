@@ -3,11 +3,11 @@ EVENTS IN TOPIC: map-events
     0x02 -> new client (id, x, y)
     0x03 -> new location (id, x, y)
     0x04 -> assigned taxi to client (taxi_id, client_id)
-    0x05 -> client requests location (loc_id)
+    0x05 -> client requests location (client_id, loc_id)
     0x06 -> taxi disconnecion (id, current_client=0) "current_client zero if no client"
     0x07 -> client disconnection (id, current_taxi=0) "current_taxi zero if no taxi"
     0x08 -> taxi moves (id, current_client=0, x, y)
     0x09 -> taxi is redirected by central (id, x, y)
     0x0a -> client is relocated (id, x, y)
-    0x0b -> taxi sensors are disconnected (id) "if taxi moves again, means sensors are connected again"
+    0x0b -> taxi sensors are disconnected or sensors are marking INCONVENIENCE (id) "if taxi moves again, means sensors are connected again"
     0x0c -> sensors stop by inconvenience (id, time_sec)

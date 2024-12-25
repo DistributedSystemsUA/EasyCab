@@ -14,15 +14,11 @@ import socket
 import argparse
 from kafka import KafkaProducer,KafkaConsumer
 
+from net_instructions import *
+
 HOST = 'localhost'
 BEL = 0x07
 TOPIC = 'map-events'
-
-IS_TAXI_ID_OK = 0x01
-TAXI_ID_OK = 0x06
-TAXI_ID_NOT_OK = 0x15
-
-STATUS_INCONVENIENCE = 0x0b
 
 service_enabled = True
 current_entity: Taxi = None
@@ -279,8 +275,23 @@ def _update_map():
 def start_service():
     global args
     global service_enabled
+    global central_communicator
     
-    map_updates = _fast_consumer(TOPIC)
+    map_updater = threading.Thread(target=_update_map)
+    map_updater.start()
+
+    sync_lock = threading.Lock()
+    sync_lock.acquire()
+    central_communicator.send(TOPIC, bytes(
+    while engine.isRunning:
+        time.sleep(1)
+        if service_enabled :
+            sync_lock.acquire()
+            engine.pointedEntity.move()
+            central_communicator.send(TOPIC, bytes(
+            sync_lock.release()
+    # A thread to consume map events
+    # A thread to produce taxi moves and events
 
 
 #TODO: change by API code
@@ -290,6 +301,7 @@ def _remote_validate(taxi_id: int) -> bool:
         skvalidator.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Permitir reutilizar el puerto
         skvalidator.connect((args.ip_central, args.puerto_central))
         skvalidator.send(bytes([IS_TAXI_ID_OK, selected_id]))
+        skvalidator.settimeout(5)
         response = skvalidator.recv(1)
         if response[0] == TAXI_ID_NOT_OK :
             return False
@@ -302,7 +314,7 @@ def _remote_validate(taxi_id: int) -> bool:
     return True
 
 
-def _obtain_valid_id() -> int:
+def _request_valid_id() -> int:
     while selected_id <= 0 or selected_id > 99:
         try:
             selected_id = int(input("Introduzca su id de taxi: "))
@@ -315,10 +327,10 @@ def validate_taxi():
     global args
     global current_entity
     if args.taxi_id is None:
-        args.taxi_id = _obtain_valid_id()
+        args.taxi_id = _request_valid_id()
 
     while not _remote_validate(args.taxi_id):
-        args.taxi_id = _obtain_valid_id()
+        args.taxi_id = _request_valid_id()
 
     current_entity = Taxi(args.taxi_id, Position(1,1))
     engine.gameMap.addEntities(current_entity)
@@ -332,10 +344,10 @@ def sensor(client_sensors: socket.socket):
     try:
         while True:
             data = client_sensors.recv(2)
-            service_enabled = False
 
+            service_enabled = False
             sensor_lock.acquire()
-            central_communicator.send(TOPIC, bytes([STATUS_INCONVENIENCE, current_entity.id]))
+            central_communicator.send(TOPIC, bytes([SENSOR_INCONVENIENCE, current_entity.id]))
             sensor_lock.release()
             
             if not data:
@@ -369,7 +381,6 @@ def init_sensor():
     receiver.start()
 
 
-# Fills the namespace variable "args" with the parsed arguments
 def parse_args():
     global args
     parser = argparse.ArgumentParser()
@@ -379,7 +390,7 @@ def parse_args():
     parser.add_argument('puerto', type=int, required=True)
     parser.add_argument('taxi_id', type=int, required=False)
 
-    args = argparse.parse_args()
+    args = parser.parse_args()
 
 
 def main():
