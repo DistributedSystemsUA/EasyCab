@@ -142,18 +142,10 @@ class Taxi(Entity):
 
 @dataclass(init = False)
 class Client(Entity) :
-    NextClientId: ClassVar[int] = ord('a')
-    OrphanClients: ClassVar[list[int]] = []
-
     dstId: int = 0
 
-    def __init__(self, origin: Position, destination: Position = None):
-        if not Client.OrphanClients :
-            self.id = Client.NextClientId
-            Client.NextClientId += 1
-        else :
-            self.id = Client.OrphanClients.pop(0)
-
+    def __init__(self, c_id: int, origin: Position, destination: Position = None):
+        self.id = c_id
         self.logType = LogType.STANDBY.value
         self.pos = origin
         self.currentTaxi = None

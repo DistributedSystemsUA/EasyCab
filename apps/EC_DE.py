@@ -230,12 +230,6 @@ def escucha_mapa():
                     engine.gameMap.addEntities(entities.Client(entities.Position(c["x_p"], c["y_p"]), entities.Position(int(c["x_d"]), int(c["y_d"]))))
             sys.exit()
 #----------------------------------------------------------------------------------------------------------
-def cerrar_programa():
-    while True:
-        if engine.isRunning == False:
-            os._exit(0)
-#-----------------------------------------------------------------------------------------------------------------
-
 
 def _fast_consumer(topic: str) -> KafkaConsumer:
     global args
@@ -254,35 +248,70 @@ def _reloc_entity(msg: bytes, e_type: type):
         engine.gameMap.relocateEntity(e, oldPos)
 
 
-def _new_taxi(msg):
+def _new_entity(msg: bytes) -> bool:
+    enType = Taxi if msg[0] == NEW_TAXI else Client
     if engine.gameMap.entities.get(msg[1]) is not None:
-        engine.gameMap.addEntities(Taxi(msg[1], Position(msg[2], msg[3])))
+        return False
+
+    engine.gameMap.addEntities(enType(msg[1], Position(msg[2], msg[3])))
+    return True
 
 
-def _new_client(msg):
+def _new_location(msg: bytes) -> bool:
+    if engine.gameMap.locations.get(msg[0]) is not None:
+        return False
+
+    engine.gameMap.addLocations(Location(msg[1], Position(msg[2], msg[3])))
+    return True
+
+
+def _taxi_gets_client(msg: bytes):
+    not_available = False
+    if engine.gameMap.entities.get(msg[1]) is None:
+        central_communicator.send(TOPIC, bytes([WHO_IS, msg[1]]))
+        not_available = True
+
     if engine.gameMap.entities.get(msg[2]) is None:
-        engine.gameMap.addEntities(Client(origin[
+        central_communicator.send(TOPIC, bytes([WHO_IS, msg[1]]))
+        not_available = True
+
+    if not_available:
+        return
+
+    engine.gameMap.entities[msg[1]].assignClient(engine.gameMap.entities[msg[2]])
+    if not client_exists:
+        central_communicator.send(TOPIC, bytes([WHO_IS, msg[1]]))
+
+
+def _taxi_moves(msg: bytes):
+    pass #TODO: When taxi moves, check for client to change condition in real time
 
 
 def _update_map():
     map_events = _fast_consumer(TOPIC)
-    INSTRUCTIONS = [ #TODO: make functions
+    INSTRUCTIONS = [_new_entity, _new_entity, _new_location,
 
+    sync_lock = threading.Lock()
     for msg in map_events:
-        #TODO: array of tuples with anonymous functions
+        sync_lock.acquire()
+        #TODO: map sync code here
+        #TODO: array of functions with the instructions
+        sync_lock.release()
 
 
 def start_service():
     global args
     global service_enabled
     global central_communicator
-    
+
     map_updater = threading.Thread(target=_update_map)
     map_updater.start()
 
     sync_lock = threading.Lock()
     sync_lock.acquire()
-    central_communicator.send(TOPIC, bytes(
+    central_communicator.send(TOPIC, bytes(NEW_TAXI, engine.pointedEntity.id, engine.pointedEntity.pos.x, engine.pointedEntity.pos.y))
+    sync_lock.release()
+
     while engine.isRunning:
         time.sleep(1)
         if service_enabled :
@@ -290,8 +319,7 @@ def start_service():
             engine.pointedEntity.move()
             central_communicator.send(TOPIC, bytes(
             sync_lock.release()
-    # A thread to consume map events
-    # A thread to produce taxi moves and events
+        # If not service enabled, there are some conditions with central communicator
 
 
 #TODO: change by API code
