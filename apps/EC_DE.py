@@ -289,13 +289,12 @@ def _taxi_moves(msg: bytes):
 
 def _update_map():
     map_events = _fast_consumer(TOPIC)
-    INSTRUCTIONS = [_new_entity, _new_entity, _new_location,
+    INSTRUCTIONS = [_new_entity, _new_entity, _new_location, #TODO: finish instructions
 
     sync_lock = threading.Lock()
     for msg in map_events:
         sync_lock.acquire()
         #TODO: map sync code here
-        #TODO: array of functions with the instructions
         sync_lock.release()
 
 
@@ -317,9 +316,13 @@ def start_service():
         if service_enabled :
             sync_lock.acquire()
             engine.pointedEntity.move()
-            central_communicator.send(TOPIC, bytes(
+            central_communicator.send(TOPIC, bytes([TAXI_MOVE, engine.pointedEntity.id, engine.pointedEntity.clientId(), *engine.pointedEntity.pos.toTuple()]))
             sync_lock.release()
         # If not service enabled, there are some conditions with central communicator
+
+    sync_lock.acquire()
+    central_communicator.send(TOPIC, bytes([TAXI_DISCONNECTED, engine.pointedEntity.id, engine.pointedEntity.clientId()]))
+    sync_lock.release()
 
 
 #TODO: change by API code
@@ -373,15 +376,15 @@ def sensor(client_sensors: socket.socket):
         while True:
             data = client_sensors.recv(2)
 
-            service_enabled = False
-            sensor_lock.acquire()
-            central_communicator.send(TOPIC, bytes([SENSOR_INCONVENIENCE, current_entity.id]))
-            sensor_lock.release()
-            
+            if data[0] == BEL and data[1] > 0:
+                sensor_lock.acquire()
+                service_enabled = False
+                central_communicator.send(TOPIC, bytes([SENSOR_INCONVENIENCE, current_entity.id]))
+                sensor_lock.release()
+                time.sleep(int(data[1]))
+
             if not data:
                 break # sensor disconnected
-            if data[0] == BEL and data[1] > 0:
-                time.sleep(int(data[1]))
 
             service_enabled = True
     except Exception as e:

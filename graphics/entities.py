@@ -98,6 +98,10 @@ class Taxi(Entity):
     def isBusy(self) -> bool:
         return self.dst is not None
 
+    
+    def clientId(self) -> int:
+        return self.currentClient.id if self.currentClient is not None else 0
+
 
     #############################
     #     Internal functions    #
