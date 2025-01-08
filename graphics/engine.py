@@ -170,7 +170,7 @@ def _processClick(x, y, button):
     elif button == RIGHT_CLICK and pointedEntity is not None:
         #pointedEntity.finishService(Position(*loc))
         producer = KafkaProducer(bootstrap_servers=broker_ip)
-        producer.send(broker_topic, bytearray([0x03, *gameMap.getBoxLoc(x,y)]))
+        producer.send(broker_topic, bytearray([0x03, *gameMap.getBoxLoc(x,y)])) #TODO: change instruction to redirection
         producer.close()
 
 
