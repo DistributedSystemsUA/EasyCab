@@ -3,12 +3,12 @@
 python3 -m venv ecpyvenv
 
 cat > aliases << EOL
-alias pyvenv="source ecpyvenv/bin/activate"
+#!/bin/bash
+alias ecpyvenv="source ecpyvenv/bin/activate"
 alias unpyvenv="deactivate"
 EOL
 
-source aliases
-pyvenv
+source ecpyvenv/bin/activate
 pip install flask confluent-kafka
 
-unpyvenv
+deactivate
