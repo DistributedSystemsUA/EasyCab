@@ -1,4 +1,5 @@
 import json
+from common import net_instructions
 
 # APLICACION CENTRAL
 
