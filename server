@@ -1,8 +1,0 @@
-#!/bin/bash
-
-$TERM -e kafka/bin/zookeeper-server-start.sh kafka/config/zookeeper.properties &
-sleep 4 && $TERM -e kafka/bin/kafka-server-start.sh kafka/config/server.properties &
-sleep 4 && kafka/bin/kafka-topics.sh --create --topic taxi-events --bootstrap-server localhost:9092
-kafka/bin/kafka-topics.sh --create --topic central-events --bootstrap-server localhost:9092
-
-disown -a
