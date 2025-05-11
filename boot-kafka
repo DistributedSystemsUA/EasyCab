@@ -1,0 +1,8 @@
+#!/bin/bash
+
+term_app=gnome_terminal
+
+${term_app} -e kafka/bin/kafka-server-start.sh kafka/config/server.properties &
+sleep 4 && kafka/bin/kafka-topics.sh --create --topic map-events --bootstrap-server localhost:9092
+
+disown -a
