@@ -6,9 +6,12 @@ cat > aliases << EOL
 #!/bin/bash
 alias ecpyvenv="source ecpyvenv/bin/activate"
 alias unpyvenv="deactivate"
+alias EC_Central="python3 app/EC_Central.py"
+alias EC_DE="python3 app/EC_DE.py"
+alias EC_Client="python3 app/EC_Client.py"
+alias EC_Clean="unalias ecpyvenv; unalias EC_Central; unalias EC_DE; unalias EC_Client; unalias EC_Clean; rm aliases; rm -rf ecpyvenv"
 EOL
 
 source ecpyvenv/bin/activate
 pip install flask confluent-kafka
-
 deactivate
