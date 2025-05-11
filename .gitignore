@@ -21,7 +21,7 @@ tests-env/
 __pycache__/
 kafka/*
 ecpyvenv/
-aliases
+setup-env
 dist/
 build/
 *.orig
