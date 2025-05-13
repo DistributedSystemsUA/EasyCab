@@ -1,9 +1,9 @@
 # Validation server instructions
 IS_TAXI_ID_OK = 0x01
-TAXI_ID_OK = 0x06
-TAXI_ID_NOT_OK = 0x15
+TAXI_ID_OK = 0x02
+TAXI_ID_NOT_OK = 0x03
 
-# Kafka server network instructions
+# Kafka server instructions
 NEW_TAXI = 0x01                             # (id, x, y, client_id)
 NEW_CLIENT = 0x02                           # (id, x, y)
 NEW_LOCATIONS = 0x03                        # (N, (id, x, y), ...)
